@@ -25,29 +25,34 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    /* translate host name into peer's IP address */
+    /* Translate host name into peer's IP address */
+    printf("Resolving hostname: %s\n", host);
     hp = gethostbyname(host);
     if (!hp) {
         fprintf(stderr, "simplex-talk: unknown host: %s\n", host);
         exit(1);
     }
 
-    /* build address data structure */
+    /* Build address data structure */
     bzero((char *)&sin, sizeof(sin));
     sin.sin_family = AF_INET;
     bcopy(hp->h_addr, (char *)&sin.sin_addr, hp->h_length);
     sin.sin_port = htons(SERVER_PORT);
 
-    /* active open */
+    /* Active open */
+    printf("Creating socket...\n");
     if ((s = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
         perror("simplex-talk: socket");
         exit(1);
     }
+
+    printf("Connecting to server at %s:%d...\n", host, SERVER_PORT);
     if (connect(s, (struct sockaddr *)&sin, sizeof(sin)) < 0) {
         perror("simplex-talk: connect");
         close(s);
         exit(1);
     }
+    printf("Connected to server successfully!\n");
 
     /* Send predefined messages */
     const char *messages[] = {
@@ -60,15 +65,18 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < num_messages; i++) {
         strncpy(buf, messages[i], MAX_LINE);
         len = strlen(buf) + 1;
+
+        printf("Sending message: %s\n", buf);
         send(s, buf, len, 0);
 
         char response[MAX_LINE + 60];
         bzero(response, sizeof(response));
         recv(s, response, sizeof(response), 0);
-        printf("Server Response: %s\n", response);
+        printf("Received from server: %s\n", response);
     }
 
     /* Close the connection */
+    printf("Closing connection to server.\n");
     close(s);
     return 0;
 }
