@@ -3,20 +3,19 @@ services:
   server:
     build:
       context: ./server
-    volumes:
-      - ./server:/app # Mount the local server directory into the container
     ports:
-      - "8080:8080" # Map port 8080 for the server
+      - "5432:5432" # Map port 5432 for the server
     networks:
       - app-network
 
   client:
     build:
       context: ./client
-    volumes:
-      - ./client:/app # Mount the local client directory into the container
     networks:
       - app-network
+    depends_on:
+      - server # Ensure the server starts before the client
+    command: ["./client", "server"] # Run the client with "server" as the hostname
 
 networks:
   app-network:

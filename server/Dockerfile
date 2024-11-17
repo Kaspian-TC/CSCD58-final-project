@@ -1,13 +1,16 @@
 FROM gcc:latest
 
-# Set working directory
+# Set the working directory
 WORKDIR /app
 
-# Copy source code into the container
+# Copy the source code into the container
 COPY server.c /app/
 
-# Expose the port for the server
-EXPOSE 8080
+# Compile the source code into an executable
+RUN gcc -o server server.c -lpthread
 
-# Compile and run the server at container startup
-CMD gcc -o server server.c -lpthread && ./server
+# Expose the server port
+EXPOSE 5432
+
+# Set the default command to run the server
+CMD ["./server"]
