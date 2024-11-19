@@ -1,6 +1,7 @@
 version: "3.8"
 services:
   server:
+    container_name: server
     build:
       context: ./server
     ports:
@@ -9,6 +10,7 @@ services:
       - app-network
 
   client:
+    container_name: client
     build:
       context: ./client
     networks:
