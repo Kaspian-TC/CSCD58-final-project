@@ -22,6 +22,9 @@ int main()
     sin.sin_family = AF_INET;
     sin.sin_addr.s_addr = INADDR_ANY;
     sin.sin_port = htons(SERVER_PORT);
+
+    printf("[SERVER] Initializing server...\n");
+
     /* setup passive open */
     if ((s = socket(PF_INET, SOCK_STREAM,
                     0)) < 0)
@@ -35,36 +38,44 @@ int main()
         exit(1);
     }
     listen(s, MAX_PENDING);
-    /* wait for connection, then receive and print text */
-    while (1)
-    {
+
+    printf("[SERVER] Server started successfully and is listening on port %d.\n", SERVER_PORT);
+
+    /* Wait for connection, then receive and echo messages */
+    while (1) {
+        printf("[SERVER] Waiting for a connection...\n");
         if ((new_s = accept(s, (struct sockaddr *)&sin, &len)) < 0)
         {
-            perror("simplex-talk: accept");
+            perror("simplex-talk: accept failed");
             exit(1);
         }
-        while (len = recv(new_s, buf, sizeof(buf), 0))
-        {
-            if (strcmp(buf, ">>> Ciao-Ciao\n") == 0 || strcmp(buf, "Ciao-Ciao\n") == 0)
-            {
-                close(new_s);
-                return 0;
+        printf("[SERVER] Connection established.\n");
+
+        while ((len = recv(new_s, buf, sizeof(buf) - 1, 0)) > 0) {
+            buf[len] = '\0'; // Null-terminate received data
+            printf("[SERVER] Message received: '%s'\n", buf);
+
+            if (strcmp(buf, "Ciao-Ciao") == 0) {
+                printf("[SERVER] Termination message received. Closing client connection.\n");
+                break; // Exit the inner loop but keep the server running
             }
-            fputs(buf, stdout);
-            time_t t = time(NULL);
-            struct tm tm = *localtime(&t);
-            char send_str[MAX_LINE + 60]; //+60 for the time
-            strcpy(send_str, buf);
-            sprintf(send_str + len-1,
-                    "%d-%02d-%02d %02d:%02d:%02d\n",
-                    tm.tm_year + 1900,
-                    tm.tm_mon + 1,
-                    tm.tm_mday,
-                    tm.tm_hour,
-                    tm.tm_min,
-                    tm.tm_sec);
-            send(new_s, send_str, strlen(send_str)+1, 0);
+
+            /* Echo the message back to the client */
+            if (send(new_s, buf, len, 0) == -1) {
+                perror("[SERVER] Error sending message");
+                break;
+            }
         }
-        close(new_s);
+
+        if (len == 0) {
+            printf("[SERVER] Connection closed by client.\n");
+        } else if (len < 0) {
+            perror("[SERVER] Error receiving data");
+        }
+
+        close(new_s); // Close the client connection
     }
+
+    close(s); // This will never be reached but is good practice
+    return 0;
 }
