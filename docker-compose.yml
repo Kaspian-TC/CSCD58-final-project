@@ -20,6 +20,8 @@ services:
         #command: ["./client", "server"] # Run the client with "server" as the hostname
     command: bash
     tty: true
+    volumes:
+      - ./client:/shared
 
 networks:
   app-network:
