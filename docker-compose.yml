@@ -1,6 +1,7 @@
 version: "3.8"
 services:
   server:
+    container_name: server
     build:
       context: ./server
     ports:
@@ -9,13 +10,18 @@ services:
       - app-network
 
   client:
+    container_name: client
     build:
       context: ./client
     networks:
       - app-network
     depends_on:
       - server # Ensure the server starts before the client
-    command: ["./client", "server"] # Run the client with "server" as the hostname
+        #command: ["./client", "server"] # Run the client with "server" as the hostname
+    command: bash
+    tty: true
+    volumes:
+      - ./client:/shared
 
 networks:
   app-network:
