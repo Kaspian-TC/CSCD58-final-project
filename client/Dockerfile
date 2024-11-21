@@ -7,7 +7,7 @@ WORKDIR /shared
 COPY client.c /shared/
 
 # Compile the source code into an executable
-RUN gcc -o client client.c -lpthread
+RUN gcc -o client client.c -lpthread -lm
 
 # Set the default command to run the client
 CMD ["./client"]

@@ -7,7 +7,7 @@ WORKDIR /app
 COPY server.c /app/
 
 # Compile the source code into an executable
-RUN gcc -o server server.c -lpthread
+RUN gcc -o server server.c -lpthread -lm
 
 # Expose the server port
 EXPOSE 5432
