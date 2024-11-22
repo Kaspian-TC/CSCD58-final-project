@@ -3,7 +3,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
-// adding libraries necessary to compile
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -11,8 +11,21 @@
 #define SERVER_PORT 5432
 #define MAX_PENDING 5
 #define MAX_LINE 256
+
+
+#define BUFFER_SIZE 1048576 // 1 MB
+#define DH_NUM_BITS 2048
+#define DH_G 5
+#define DH_KEY_SIZE 256
+#define DH_NONCE_SIZE 16
+#define AES_KEY_SIZE 32
+
+/* FUNCTION DECLARATIONS */
+void receive_client_hello(int socket);
+
 int main()
 {
+    setbuf(stdout, NULL);
     struct sockaddr_in sin;
     char buf[MAX_LINE];
     int len;
@@ -41,7 +54,7 @@ int main()
 
     printf("[SERVER] Server started successfully and is listening on port %d.\n", SERVER_PORT);
 
-    /* Wait for connection, then receive and echo messages */
+    /* Wait for connection */
     while (1) {
         printf("[SERVER] Waiting for a connection...\n");
         if ((new_s = accept(s, (struct sockaddr *)&sin, &len)) < 0)
@@ -51,31 +64,73 @@ int main()
         }
         printf("[SERVER] Connection established.\n");
 
-        while ((len = recv(new_s, buf, sizeof(buf) - 1, 0)) > 0) {
-            buf[len] = '\0'; // Null-terminate received data
-            printf("[SERVER] Message received: '%s'\n", buf);
+        // the client is sending the payload for Diffie-Hellman key exchange
+        // for now, lets just recieve the payload and print it
 
-            if (strcmp(buf, "Ciao-Ciao") == 0) {
-                printf("[SERVER] Termination message received. Closing client connection.\n");
-                break; // Exit the inner loop but keep the server running
-            }
+        receive_client_hello(new_s);
 
-            /* Echo the message back to the client */
-            if (send(new_s, buf, len, 0) == -1) {
-                perror("[SERVER] Error sending message");
-                break;
-            }
-        }
+        // close the connection
+        close(new_s);
 
-        if (len == 0) {
-            printf("[SERVER] Connection closed by client.\n");
-        } else if (len < 0) {
-            perror("[SERVER] Error receiving data");
-        }
-
-        close(new_s); // Close the client connection
+        printf("[SERVER] Connection closed.\n");
     }
 
     close(s); // This will never be reached but is good practice
     return 0;
+}
+
+// TLS IMPLEMENTATION - Server side
+
+// Diffie-Hellman key exchange
+void receive_client_hello(int socket)
+{
+    // receive p, dhA, nonce from client
+    char client_payload[DH_NUM_BITS + DH_KEY_SIZE + DH_NONCE_SIZE];
+    int payload_len = recv(socket, client_payload, sizeof(client_payload), 0);
+    printf("[SERVER] Received payload of size %d\n", payload_len);
+
+    // payload is in the format p (bytes) + dhA (bytes) + nonce (bytes)
+    // extract p, dhA, nonce from payload
+    int p;
+    int dhA;
+    char n0[DH_NONCE_SIZE];
+
+    memcpy(&p, client_payload, sizeof(p));
+    memcpy(&dhA, client_payload + sizeof(p), sizeof(dhA));
+    memcpy(n0, client_payload + sizeof(p) + sizeof(dhA), sizeof(n0));
+
+    printf("[SERVER] Received p = %d, dhA = %d, nonce = %d\n", p, dhA, n0[0]);
+
+    // print n0
+    printf("[SERVER] Received nonce: ");
+    for (int i = 0; i < DH_NONCE_SIZE; i++)
+    {
+        printf("%d ", n0[i]);
+    }
+    printf("\n");
+
+    int b = 4; // placeholder for secret number
+    int dhB = (int)pow(DH_G, b) % p;
+
+    // master key m = dha^b mod p
+    int m = (int)pow(dhA, b) % p;
+
+    // nonce is a random byte string of length DH_NONCE_SIZE
+    int n1[DH_NONCE_SIZE];
+    for (int i = 0; i < DH_NONCE_SIZE; i++)
+    {
+        n1[i] = rand() % 256;
+    }
+
+    // create session key HDKF
+    int session_key = 1234; // placeholder for session key
+
+    // send dhB, nonce to client
+    // payload = dhB (bytes) + nonce (bytes)
+    char server_payload[DH_KEY_SIZE + DH_NONCE_SIZE];
+    memcpy(server_payload, &dhB, sizeof(dhB));
+    memcpy(server_payload + sizeof(dhB), n1, sizeof(n1));
+
+    printf("[SERVER] Sending payload to client of size %d\n", sizeof(server_payload));
+    send(socket, server_payload, sizeof(server_payload), 0);
 }
