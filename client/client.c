@@ -7,11 +7,34 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <gmp.h>
+#include <time.h>
 #define SERVER_PORT 5432
 #define MAX_LINE 256
 
+void getBigPrime(mpz_t prime)
+{
+    // mpz_t z;
+    // gmp_printf ("%s is an mpz %Zd\n", "here", z);
+    mpz_t random_number;
+    mpz_init(random_number);
+    gmp_randstate_t state;
+    gmp_randinit_mt(state);
+    gmp_randseed_ui(state, time(NULL));
+    mpz_urandomb(random_number, state, 2048);
+    mpz_nextprime(prime, random_number);
+    gmp_randclear(state);
+    mpz_clear(random_number);
+    // mpz_nextprime(prime, 2);
+    
+}
 int main(int argc, char *argv[])
 {
+    mpz_t prime;
+    mpz_init2(prime,2048);
+    getBigPrime(prime);
+
+    gmp_printf("Prime number: %Zd\n", prime);
     FILE *fp;
     struct hostent *hp;
     struct sockaddr_in sin;

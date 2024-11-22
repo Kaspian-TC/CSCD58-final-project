@@ -21,7 +21,7 @@ services:
     command: bash
     tty: true
     volumes:
-      - ./client:/shared
+      - ./:/shared
 
 networks:
   app-network:
