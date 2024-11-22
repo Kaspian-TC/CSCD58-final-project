@@ -1,10 +1,10 @@
 FROM gcc:latest
 
 # Set the working directory
-WORKDIR /shared
+WORKDIR /app/shared
 
 # Copy the source code into the container
-COPY client.c /shared/
+COPY client.c /app/shared/
 
 # Compile the source code into an executable
 RUN gcc -o client client.c -lpthread -lm
