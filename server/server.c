@@ -28,7 +28,7 @@ int main()
     setbuf(stdout, NULL);
     struct sockaddr_in sin;
     char buf[MAX_LINE];
-    int len;
+    unsigned int len;
     int s, new_s;
     /* build address data structure */
     bzero((char *)&sin, sizeof(sin));
@@ -131,6 +131,6 @@ void receive_client_hello(int socket)
     memcpy(server_payload, &dhB, sizeof(dhB));
     memcpy(server_payload + sizeof(dhB), n1, sizeof(n1));
 
-    printf("[SERVER] Sending payload to client of size %d\n", sizeof(server_payload));
+    printf("[SERVER] Sending payload to client of size %ld\n", sizeof(server_payload));
     send(socket, server_payload, sizeof(server_payload), 0);
 }
