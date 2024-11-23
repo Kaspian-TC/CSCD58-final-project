@@ -9,6 +9,8 @@
 #include <unistd.h>
 #include <time.h>
 #include <gmp.h>
+
+#include "server.h"
 #define SERVER_PORT 5432
 #define MAX_PENDING 5
 #define MAX_LINE 256
@@ -21,8 +23,7 @@
 #define DH_NONCE_SIZE 16
 #define AES_KEY_SIZE 32
 
-/* FUNCTION DECLARATIONS */
-void receive_client_hello(int socket);
+
 
 int main()
 {
@@ -55,6 +56,11 @@ int main()
 
     printf("[SERVER] Server started successfully and is listening on port %d.\n", SERVER_PORT);
 
+    gmp_randstate_t state; // make sure to call gmp_randclear(state); 
+    // when done with state
+    gmp_randinit_mt(state);
+    gmp_randseed_ui(state, time(NULL));
+
     /* Wait for connection */
     while (1) {
         printf("[SERVER] Waiting for a connection...\n");
@@ -68,13 +74,14 @@ int main()
         // the client is sending the payload for Diffie-Hellman key exchange
         // for now, lets just recieve the payload and print it
 
-        receive_client_hello(new_s);
+        receive_client_hello(new_s, state);
 
         // close the connection
         close(new_s);
 
         printf("[SERVER] Connection closed.\n");
     }
+    gmp_randclear(state);
 
     close(s); // This will never be reached but is good practice
     return 0;
@@ -83,7 +90,7 @@ int main()
 // TLS IMPLEMENTATION - Server side
 
 // Diffie-Hellman key exchange
-void receive_client_hello(int socket)
+void receive_client_hello(int socket, gmp_randstate_t state)
 {
     // receive p, dhA, nonce from client
     char client_payload[DH_NUM_BITS + DH_KEY_SIZE + DH_NONCE_SIZE];
@@ -123,10 +130,7 @@ void receive_client_hello(int socket)
     }
     printf("\n");
     
-    gmp_randstate_t state; // make sure to call gmp_randclear(state); 
-    // when done with state
-    gmp_randinit_mt(state);
-    gmp_randseed_ui(state, time(NULL));
+    
     
     mpz_t b;
     mpz_t g;
