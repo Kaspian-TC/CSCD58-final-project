@@ -9,17 +9,22 @@
 #include <unistd.h>
 #include <gmp.h>
 #include <time.h>
+
+#include "client.h"
+
 #define SERVER_PORT 5432
 #define MAX_LINE 256
+// test comment
+// another test commment
 
-
-void getBigPrime(mpz_t prime, gmp_randstate_t state)
+void get_big_prime(mpz_t prime, gmp_randstate_t state)
 {
     // mpz_t z;
     // gmp_printf ("%s is an mpz %Zd\n", "here", z);
     mpz_t random_number;
     mpz_init(random_number);
     mpz_urandomb(random_number, state, 2048);
+
     mpz_nextprime(prime, random_number);
     
     mpz_clear(random_number);
@@ -27,18 +32,11 @@ void getBigPrime(mpz_t prime, gmp_randstate_t state)
     
 }
 
-/* FUNCTION DECLARATIONS */
-void send_client_hello(int socket);
+
 
 int main(int argc, char *argv[])
 {
     
-    /* mpz_t prime;
-    mpz_init2(prime,2048);
-    getBigPrime(prime,state);
-
-    gmp_printf("Prime number: %Zd\n", prime);
-    mpz_clear(prime); */
     FILE *fp;
     struct hostent *hp;
     struct sockaddr_in sin;
@@ -84,28 +82,36 @@ int main(int argc, char *argv[])
     /* main loop: get and send lines of text */
     printf("has connected to server at %s\n", host);
 
-    // just test sending the payload for Diffie-Hellman key exchange
-    send_client_hello(s);
+    // set state for random number generation (mercenene twister)
+    gmp_randstate_t state; // make sure to call gmp_randclear(state); 
+    // when done with state
+    gmp_randinit_mt(state);
+    gmp_randseed_ui(state, time(NULL));
+
+    
+    mpz_t prime, dhA_mpz, a;
+    initialize_values(prime, dhA_mpz, a, state);
+    send_client_hello(s,prime, dhA_mpz, a);
     // close the connection
     close(s);
     return 0;
 
 
-    // while (fgets(buf, sizeof(buf), stdin))
-    // {
-    //     len = strlen(buf) + 1;
-    //     send(s, buf, len, 0);
+    /* while (fgets(buf, sizeof(buf), stdin))
+    {
+        len = strlen(buf) + 1;
+        send(s, buf, len, 0);
 
-    //     char buf_2[MAX_LINE+60];
-    //     buf_2[MAX_LINE + 60 - 1] = '\0';
-    //     len = recv(s, buf_2, sizeof(buf_2), 0);
-    //     printf("%s",buf_2);
-	// 	if (strcmp(buf, ">>> Ciao-Ciao\n") == 0 || strcmp(buf, "Ciao-Ciao\n") == 0)
-	// 	{
-	// 		close(s);
-	// 		return 0;
-	// 	}
-	// }
+        char buf_2[MAX_LINE+60];
+        buf_2[MAX_LINE + 60 - 1] = '\0';
+        len = recv(s, buf_2, sizeof(buf_2), 0);
+        printf("%s",buf_2);
+		if (strcmp(buf, ">>> Ciao-Ciao\n") == 0 || strcmp(buf, "Ciao-Ciao\n") == 0)
+		{
+			close(s);
+			return 0;
+		}
+	} */
 }
 
 // TLS IMPLEMENTATION - Client side
@@ -121,58 +127,43 @@ int main(int argc, char *argv[])
 #define DH_NONCE_SIZE 16
 #define AES_KEY_SIZE 32
 
-// send_client_hello function contains all information passed to command line
-// we want to generate p, a, dhA, nonce and send it to server as payload
-void send_client_hello(int socket)
-{
-    // set state for random number generation (mercenene twister)
-    gmp_randstate_t state; // make sure to call gmp_randclear(state); 
-    // when done with state
+void initialize_values(mpz_t prime, mpz_t dhA_mpz, mpz_t a,
+ gmp_randstate_t state){
+    mpz_t g;
+    mpz_inits(a,g,NULL);
     
-    gmp_randinit_mt(state);
-    gmp_randseed_ui(state, time(NULL));
-
-    mpz_t prime; // make sure to call mpz_clear(p); after using p
-    mpz_init2(prime,2048);
-    getBigPrime(prime,state);
+    mpz_init2(dhA_mpz,DH_NUM_BITS);
+    mpz_init2(prime,DH_NUM_BITS);//make sure to call mpz_clear(); after using
+    
+    get_big_prime(prime,state);
 
     gmp_printf("Prime number: %Zd\n", prime);
 
-
-
-    int p = 7; // placeholder for 2048 bit prime number
-    /* mpz_t a; // placeholder for secret number
-    mpz_init(a);
-    mpz_urandomb(a, state, DH_NUM_BITS); */
-    mpz_t a;
-    mpz_init(a);
-    mpz_urandomb(a, state, 2048);
-    gmp_printf("a: %Zd\n", a);
+    mpz_urandomb(a, state, DH_NUM_BITS);
     // compute dhA = g^a mod p
-    int dhA = 5; // (int)pow(DH_G, a) % p;
     // initialize g 
-    mpz_t g;
-    mpz_init(g);
     mpz_set_ui(g,DH_G);
-    // initialize dhA mpz_t
-    mpz_t dhA_mpz;
-    mpz_init2(dhA_mpz,2048);
+
     mpz_powm(dhA_mpz,g,a,prime); // dhA = g^a mod p
-    gmp_printf("dhA: %Zd\n", dhA_mpz);
+    mpz_clear(g);
+}
+
+// send_client_hello function contains all information passed to command line
+// we want to generate p, a, dhA, nonce and send it to server as payload
+void send_client_hello(int socket,
+ mpz_t prime, 
+ mpz_t dhA_mpz, 
+ mpz_t a){
 
     // convert dhA to string of bytes
     char dhA_bytes[DH_KEY_SIZE];
-
-
-    /* array, count (# of words produced), size(bytes per), endian (1 for big,
-     -1 for little, 0 for native cpu), nails (The number of most significant 
-     bits to skip), op (The integer to convert)
+    /* array, count (# of words produced), size(bytes per), order(set 1), endian 
+    (1 for big, -1 for little, 0 for native cpu), nails (The number of most 
+     significant bits to skip), op (The integer to convert)
     */
-
-    mpz_export(dhA_bytes, NULL, 1, 1, 0, 0, dhA_mpz);
-
-    // use mpz_import to convert back to mpz_t
-
+    mpz_export(dhA_bytes, NULL, 1, 1, 1, 0, dhA_mpz);
+    char prime_bytes[DH_KEY_SIZE];
+    mpz_export(prime_bytes, NULL, 1, 1, 1, 0, prime);
     
     // nonce is a random byte string of length DH_NONCE_SIZE
     char nonce[DH_NONCE_SIZE];
@@ -183,13 +174,16 @@ void send_client_hello(int socket)
 
     // send p, dhA, nonce to server
     // payload = p (bytes) + dhA (bytes) + nonce (bytes)
-    char payload[DH_NUM_BITS + DH_KEY_SIZE + DH_NONCE_SIZE];
-    memcpy(payload, &p, sizeof(p));
-    memcpy(payload + sizeof(p), &dhA, sizeof(dhA));
-    memcpy(payload + sizeof(p) + sizeof(dhA), nonce, sizeof(nonce));
+    char payload[DH_KEY_SIZE + DH_KEY_SIZE + DH_NONCE_SIZE];
+    memcpy(payload, prime_bytes, sizeof(prime_bytes));
+    memcpy(payload + DH_KEY_SIZE, dhA_bytes, DH_KEY_SIZE);
+    memcpy(payload + DH_KEY_SIZE + DH_KEY_SIZE, nonce,
+     DH_NONCE_SIZE);
 
-    printf("[CLIENT] Sending payload to server of size %ld\n", sizeof(payload));
-    printf("[CLIENT] p = %d, dhA = %d, nonce = %d\n", p, dhA, nonce[0]);
+    printf("[CLIENT] Sending payload to server of size %ld\n",
+     sizeof(payload));
+    gmp_printf("[CLIENT] p = %Zd, dhA = %Zd, nonce = %d\n", prime, dhA_mpz,
+     nonce[0]);
 
     // print nonce
     for (int i = 0; i < DH_NONCE_SIZE; i++)

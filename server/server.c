@@ -8,6 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
+#include <gmp.h>
 #define SERVER_PORT 5432
 #define MAX_PENDING 5
 #define MAX_LINE 256
@@ -94,12 +95,25 @@ void receive_client_hello(int socket)
     int p;
     int dhA;
     char n0[DH_NONCE_SIZE];
+    // use mpz_import to convert back to mpz_t
+    
+    char dhA_bytes[DH_KEY_SIZE];
+    char prime_bytes[DH_KEY_SIZE];
 
-    memcpy(&p, client_payload, sizeof(p));
-    memcpy(&dhA, client_payload + sizeof(p), sizeof(dhA));
-    memcpy(n0, client_payload + sizeof(p) + sizeof(dhA), sizeof(n0));
+    memcpy(prime_bytes, client_payload, DH_KEY_SIZE);
+    memcpy(dhA_bytes, client_payload + DH_KEY_SIZE, DH_KEY_SIZE);
+    memcpy(n0, client_payload + DH_KEY_SIZE + DH_KEY_SIZE, DH_NONCE_SIZE);
 
-    printf("[SERVER] Received p = %d, dhA = %d, nonce = %d\n", p, dhA, n0[0]);
+    mpz_t prime;
+    mpz_init2(prime,DH_NUM_BITS);
+    mpz_import(prime, DH_KEY_SIZE, 1, 1, 1, 0, prime_bytes);
+    
+    mpz_t dhA_mpz;
+    mpz_init2(dhA_mpz,DH_NUM_BITS);
+    mpz_import(dhA_mpz, DH_KEY_SIZE, 1, 1, 1, 0, dhA_bytes);
+
+    gmp_printf("dhB_mpz: %Zd\n", dhA_mpz); // this is a test
+    gmp_printf("[SERVER] Received p = %Zd, dhA = %Zd, nonce = %d\n", prime, dhA_mpz, n0[0]);
 
     // print n0
     printf("[SERVER] Received nonce: ");
@@ -108,12 +122,34 @@ void receive_client_hello(int socket)
         printf("%d ", n0[i]);
     }
     printf("\n");
+    
+    gmp_randstate_t state; // make sure to call gmp_randclear(state); 
+    // when done with state
+    gmp_randinit_mt(state);
+    gmp_randseed_ui(state, time(NULL));
+    
+    mpz_t b;
+    mpz_t g;
+    mpz_inits(b,g,NULL);
+    
+    mpz_t dhB_mpz;
+    mpz_init2(dhB_mpz,DH_NUM_BITS);
+    mpz_urandomb(b, state, DH_NUM_BITS);
 
-    int b = 4; // placeholder for secret number
-    int dhB = (int)pow(DH_G, b) % p;
+    mpz_set_ui(g,DH_G);
 
-    // master key m = dha^b mod p
-    int m = (int)pow(dhA, b) % p;
+    mpz_powm(dhB_mpz,g,b,prime); // dhB = g^b mod p
+    // int dhB = (int)pow(DH_G, b) % p;
+
+    mpz_t master_key;
+    mpz_init(master_key);
+    mpz_powm(master_key,dhB_mpz,b,prime); // m = dhA^b mod p
+    // int m = (int)pow(dhA, b) % p;
+
+    gmp_printf("[SERVER] Calculated dhB = %Zd, master key = %Zd\n", dhB_mpz, master_key);
+    // convert dhB to string of bytes
+    char dhB_bytes[DH_KEY_SIZE];
+    mpz_export(dhB_bytes, NULL, 1, 1, 1, 0, dhB_mpz);
 
     // nonce is a random byte string of length DH_NONCE_SIZE
     int n1[DH_NONCE_SIZE];
@@ -128,8 +164,8 @@ void receive_client_hello(int socket)
     // send dhB, nonce to client
     // payload = dhB (bytes) + nonce (bytes)
     char server_payload[DH_KEY_SIZE + DH_NONCE_SIZE];
-    memcpy(server_payload, &dhB, sizeof(dhB));
-    memcpy(server_payload + sizeof(dhB), n1, sizeof(n1));
+    memcpy(server_payload, dhB_bytes, DH_KEY_SIZE);
+    memcpy(server_payload + DH_KEY_SIZE, n1, DH_NONCE_SIZE);
 
     printf("[SERVER] Sending payload to client of size %ld\n", sizeof(server_payload));
     send(socket, server_payload, sizeof(server_payload), 0);
