@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <gmp.h>
+#include <arpa/inet.h>
 
 #include "server.h"
 #define SERVER_PORT 5432
@@ -23,8 +24,109 @@
 #define DH_NONCE_SIZE 16
 #define AES_KEY_SIZE 32
 
+const char* SERVER_IPS[] = {"server1", "server2", "server3"};
+const int NUM_SERVERS = 3;
 
+// Function to forward a single chunk of data to the appropriate storage server
+void forward_to_server(const char* server_ip, const char* payload) {
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
 
+    if (sock < 0) {
+        perror("Socket creation failed");
+        exit(1);
+    }
+
+    struct sockaddr_in server;
+    server.sin_family = AF_INET;
+    server.sin_port = htons(SERVER_PORT);
+    inet_pton(AF_INET, server_ip, &server.sin_addr);
+
+    if (connect(sock, (struct sockaddr*)&server, sizeof(server)) < 0) {
+        perror("Connection to storage server failed");
+        close(sock);
+        exit(1);
+    }
+
+    send(sock, payload, strlen(payload), 0);
+    printf("[ROUTER] Forwarded chunk '%s' to server %s\n", payload, server_ip);
+    close(sock);
+}
+
+// Function to shard data and distribute chunks across servers
+void shard_and_distribute(const char* data) {
+    for (int i = 0; i < strlen(data); i++) {
+        char chunk[2] = {data[i], '\0'}; // Create a single-character chunk
+        const char* target_server = SERVER_IPS[i % NUM_SERVERS];
+        forward_to_server(target_server, chunk);
+    }
+}
+
+// Function to store data locally on the storage server
+void store_data(const char* payload) {
+    FILE* fp = fopen("data.txt", "a");
+    if (fp == NULL) {
+        perror("Failed to open storage file");
+        exit(1);
+    }
+
+    fprintf(fp, "%s\n", payload);
+    fclose(fp);
+    printf("[STORAGE] Stored payload locally: %s\n", payload);
+}
+
+int main(int argc, char* argv[]) {
+    struct sockaddr_in sin;
+    char buf[MAX_LINE];
+    int len, s, new_s;
+
+    // Determine if the server acts as a router or storage server
+    int is_router = (argc == 2 && strcmp(argv[1], "router") == 0);
+
+    // Build address data structure
+    bzero((char*)&sin, sizeof(sin));
+    sin.sin_family = AF_INET;
+    sin.sin_addr.s_addr = INADDR_ANY;
+    sin.sin_port = htons(SERVER_PORT);
+
+    if ((s = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
+        perror("Socket creation failed");
+        exit(1);
+    }
+
+    if ((bind(s, (struct sockaddr*)&sin, sizeof(sin))) < 0) {
+        perror("Binding failed");
+        close(s);
+        exit(1);
+    }
+
+    listen(s, MAX_PENDING);
+    printf("[SERVER] %s started on port %d.\n", is_router ? "Router" : "Storage Server", SERVER_PORT);
+
+    while (1) {
+        if ((new_s = accept(s, (struct sockaddr*)&sin, &len)) < 0) {
+            perror("Accept failed");
+            close(s);
+            exit(1);
+        }
+
+        len = recv(new_s, buf, sizeof(buf) - 1, 0);
+        buf[len] = '\0';
+
+        if (is_router) {
+            printf("[ROUTER] Received data: %s\n", buf);
+            shard_and_distribute(buf); // Split and distribute data to storage servers
+        } else {
+            printf("[STORAGE] Received data: %s\n", buf);
+            store_data(buf); // Store the data locally
+        }
+
+        close(new_s);
+    }
+
+    close(s);
+    return 0;
+}
+/*
 int main()
 {
     setbuf(stdout, NULL);
@@ -32,7 +134,7 @@ int main()
     char buf[MAX_LINE];
     unsigned int len;
     int s, new_s;
-    /* build address data structure */
+    // build address data structure
     bzero((char *)&sin, sizeof(sin));
     sin.sin_family = AF_INET;
     sin.sin_addr.s_addr = INADDR_ANY;
@@ -40,7 +142,7 @@ int main()
 
     printf("[SERVER] Initializing server...\n");
 
-    /* setup passive open */
+    // setup passive open
     if ((s = socket(PF_INET, SOCK_STREAM,
                     0)) < 0)
     {
@@ -61,7 +163,7 @@ int main()
     gmp_randinit_mt(state);
     gmp_randseed_ui(state, time(NULL));
 
-    /* Wait for connection */
+    // wait for connection
     while (1) {
         printf("[SERVER] Waiting for a connection...\n");
         if ((new_s = accept(s, (struct sockaddr *)&sin, &len)) < 0)
@@ -86,7 +188,7 @@ int main()
     close(s); // This will never be reached but is good practice
     return 0;
 }
-
+*/
 // TLS IMPLEMENTATION - Server side
 
 // Diffie-Hellman key exchange
