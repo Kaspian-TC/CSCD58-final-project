@@ -9,6 +9,6 @@ COPY client.h .
 COPY Makefile .
 
 # Compile the source code into an executable
-RUN make  # Use Makefile to build the client executable
+RUN make
 
 # Set the default command to run 
