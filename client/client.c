@@ -90,11 +90,16 @@ int main(int argc, char *argv[])
 
     
     mpz_t prime, dhA_mpz, a;
+    mpz_init2(prime,2048);//make sure to call mpz_clear(); after using
+    
+    get_big_prime(prime,state);
+
     initialize_values(prime, dhA_mpz, a, state);
     send_client_hello(s,prime, dhA_mpz, a,state);
     receive_server_hello(s, prime, dhA_mpz, a,state);
     // close the connection
     close(s);
+    mpz_clears(prime,dhA_mpz,a,NULL);
     return 0;
 
 
@@ -127,27 +132,6 @@ int main(int argc, char *argv[])
 #define DH_KEY_SIZE 256
 #define DH_NONCE_SIZE 16
 #define AES_KEY_SIZE 32
-
-void initialize_values(mpz_t prime, mpz_t dhA_mpz, mpz_t a,
- gmp_randstate_t state){
-    mpz_t g;
-    mpz_inits(a,g,NULL);
-    
-    mpz_init2(dhA_mpz,DH_NUM_BITS);
-    mpz_init2(prime,DH_NUM_BITS);//make sure to call mpz_clear(); after using
-    
-    get_big_prime(prime,state);
-
-    gmp_printf("Prime number: %Zd\n", prime);
-
-    mpz_urandomb(a, state, DH_NUM_BITS);
-    // compute dhA = g^a mod p
-    // initialize g 
-    mpz_set_ui(g,DH_G);
-
-    mpz_powm(dhA_mpz,g,a,prime); // dhA = g^a mod p
-    mpz_clear(g);
-}
 
 // send_client_hello function contains all information passed to command line
 // we want to generate p, a, dhA, nonce and send it to server as payload
@@ -213,10 +197,22 @@ gmp_randstate_t state){
     memcpy(dhB_bytes, client_payload, DH_KEY_SIZE);
     memcpy(n1, client_payload + DH_KEY_SIZE, DH_NONCE_SIZE);
     
-    printf("[CLIENT] Received nonce: ");
+    /* printf("[CLIENT] Received nonce: ");
     for (int i = 0; i < DH_NONCE_SIZE; i++)
     {
         printf("%d ", n1[i]);
-    }
+    } */
+    mpz_t dhB_mpz;
+    mpz_init2(dhB_mpz,DH_NUM_BITS);
+    mpz_import(dhB_mpz, DH_KEY_SIZE, 1, 1, 1, 0, dhB_bytes);
+
+    gmp_printf("[CLIENT] Received dhB = %Zd\n", dhB_mpz);
+
+    mpz_t master_key;
+    mpz_init(master_key);
+    mpz_powm(master_key,dhB_mpz,a,prime); // m = dhB^a mod p
+    gmp_printf("[CLIENT] master = %Zd\n", master_key);
+    mpz_clears(dhB_mpz,master_key,NULL);
+
     printf("\n");
 }

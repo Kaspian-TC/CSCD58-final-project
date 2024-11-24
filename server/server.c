@@ -119,7 +119,6 @@ void receive_client_hello(int socket, gmp_randstate_t state)
     mpz_init2(dhA_mpz,DH_NUM_BITS);
     mpz_import(dhA_mpz, DH_KEY_SIZE, 1, 1, 1, 0, dhA_bytes);
 
-    gmp_printf("dhB_mpz: %Zd\n", dhA_mpz); // this is a test
     gmp_printf("[SERVER] Received p = %Zd, dhA = %Zd, nonce = %d\n", prime, dhA_mpz, n0[0]);
 
     // print n0
@@ -134,21 +133,19 @@ void receive_client_hello(int socket, gmp_randstate_t state)
     
     mpz_t b;
     mpz_t g;
-    mpz_inits(b,g,NULL);
-    
     mpz_t dhB_mpz;
-    mpz_init2(dhB_mpz,DH_NUM_BITS);
-    mpz_urandomb(b, state, DH_NUM_BITS);
+    initialize_values(prime,dhB_mpz,b,state);
+    /* mpz_urandomb(b, state, DH_NUM_BITS);
 
     mpz_set_ui(g,DH_G);
 
     mpz_powm(dhB_mpz,g,b,prime); // dhB = g^b mod p
-    // int dhB = (int)pow(DH_G, b) % p;
-
+ */
     mpz_t master_key;
     mpz_init(master_key);
-    mpz_powm(master_key,dhB_mpz,b,prime); // m = dhA^b mod p
+    mpz_powm(master_key,dhA_mpz,b,prime); // m = dhA^b mod p
     // int m = (int)pow(dhA, b) % p;
+    mpz_clear(dhA_mpz);
 
     gmp_printf("[SERVER] Calculated dhB = %Zd, master key = %Zd\n", dhB_mpz, master_key);
     // convert dhB to string of bytes
@@ -180,4 +177,5 @@ void receive_client_hello(int socket, gmp_randstate_t state)
 
     printf("[SERVER] Sending payload to client of size %ld\n", sizeof(server_payload));
     send(socket, server_payload, sizeof(server_payload), 0);
+    mpz_clears(prime,dhB_mpz,b,master_key,NULL);
 }

@@ -11,6 +11,5 @@ mpz_t dhA_mpz,
 mpz_t a,
 gmp_randstate_t state);
 
-void initialize_values(mpz_t prime, mpz_t dhA_mpz, mpz_t a,
- gmp_randstate_t state);
+
 
