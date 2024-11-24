@@ -1,18 +1,16 @@
 FROM gcc:latest
 
-# Set the working directory
-WORKDIR /shared/server/
+# Set the working directory for the server
+WORKDIR /app/server
 
-# Copy the source code and Makefile into the container
-COPY server.c .
-COPY server.h .
-COPY Makefile .
+# Copy the server folder to the container
+COPY . /app/server/
 
-# Compile the source code into an executable
+# Ensure shared folder is available
+VOLUME /app/shared
+
+# Build the server executable during the image build process
 RUN make
 
-# Expose the server port
-EXPOSE 5432
-
-# Set the default command to run the server
-ENTRYPOINT ["./server"]
+# Default command to start the server
+CMD ["./server"]

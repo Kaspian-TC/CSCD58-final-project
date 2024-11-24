@@ -1,64 +1,68 @@
 version: "3.8"
 services:
-  # Client service
   client:
     container_name: client
     build:
       context: ./client
+    working_dir: /app/client
+    volumes:
+      - ./shared:/app/shared
     networks:
       - app-network
     depends_on:
-      - router # Ensure the router starts before the client
-    command: bash # Client starts in an interactive shell
+      - router
+    stdin_open: true
     tty: true
-    volumes:
-      - ./:/shared
 
-  # Router service
   router:
     container_name: router
     build:
-      context: ./router # Updated to use the router folder
+      context: ./router
+    working_dir: /app/router
+    volumes:
+      - ./shared:/app/shared
     networks:
       - app-network
-    ports:
-      - "5432:5432" # Expose router on port 5432 for client communication
     depends_on:
       - server1
       - server2
       - server3
-    command: ["./router"] # Router executable
-    tty: true
+    ports:
+      - "5432:5432"
+    command: ["./router"]
 
-  # Storage server 1
   server1:
     container_name: server1
     build:
       context: ./server
+    working_dir: /app/server
+    volumes:
+      - ./shared:/app/shared
     networks:
       - app-network
-    command: ["./server"] # Default storage server mode
-    tty: true
+    command: ["./server"]
 
-  # Storage server 2
   server2:
     container_name: server2
     build:
       context: ./server
+    working_dir: /app/server
+    volumes:
+      - ./shared:/app/shared
     networks:
       - app-network
-    command: ["./server"] # Default storage server mode
-    tty: true
+    command: ["./server"]
 
-  # Storage server 3
   server3:
     container_name: server3
     build:
       context: ./server
+    working_dir: /app/server
+    volumes:
+      - ./shared:/app/shared
     networks:
       - app-network
-    command: ["./server"] # Default storage server mode
-    tty: true
+    command: ["./server"]
 
 networks:
   app-network:

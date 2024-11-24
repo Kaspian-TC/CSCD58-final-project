@@ -1,14 +1,16 @@
 FROM gcc:latest
 
 # Set the working directory
-WORKDIR /shared/client/
+WORKDIR /app/client
 
-# Copy the source code and Makefile into the container
-COPY client.c .
-COPY client.h .
-COPY Makefile .
+# Copy the client folder to the container
+COPY . /app/client/
 
-# Compile the source code into an executable
+# Ensure shared folder is available
+VOLUME /app/shared
+
+# Build the client executable during the image build process
 RUN make
 
-# Set the default command to run 
+# Default command to start the client
+CMD ["bash"]
