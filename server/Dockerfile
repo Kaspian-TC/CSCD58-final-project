@@ -7,7 +7,7 @@ WORKDIR /shared/server/
 COPY server.c /shared/server/
 
 # Compile the source code into an executable
-RUN make
+# RUN make
 
 # Expose the server port
 EXPOSE 5432

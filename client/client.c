@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <gmp.h>
 #include <time.h>
-
+#include "../shared_functions/helper_func.h"
 #include "client.h"
 
 #define SERVER_PORT 5432
@@ -91,7 +91,8 @@ int main(int argc, char *argv[])
     
     mpz_t prime, dhA_mpz, a;
     initialize_values(prime, dhA_mpz, a, state);
-    send_client_hello(s,prime, dhA_mpz, a);
+    send_client_hello(s,prime, dhA_mpz, a,state);
+    receive_server_hello(s, prime, dhA_mpz, a,state);
     // close the connection
     close(s);
     return 0;
@@ -153,7 +154,8 @@ void initialize_values(mpz_t prime, mpz_t dhA_mpz, mpz_t a,
 void send_client_hello(int socket,
  mpz_t prime, 
  mpz_t dhA_mpz, 
- mpz_t a){
+ mpz_t a,
+ gmp_randstate_t state){
 
     // convert dhA to string of bytes
     char dhA_bytes[DH_KEY_SIZE];
@@ -166,32 +168,55 @@ void send_client_hello(int socket,
     mpz_export(prime_bytes, NULL, 1, 1, 1, 0, prime);
     
     // nonce is a random byte string of length DH_NONCE_SIZE
-    char nonce[DH_NONCE_SIZE];
-    for (int i = 0; i < DH_NONCE_SIZE; i++)
+    char n0[DH_NONCE_SIZE];
+    /* for (int i = 0; i < DH_NONCE_SIZE; i++)
     {
-        nonce[i] = rand() % 256;
-    }
+        n0[i] = rand() % 256;
+    } */
+    get_random_bytes(n0, DH_NONCE_SIZE, state);
 
     // send p, dhA, nonce to server
     // payload = p (bytes) + dhA (bytes) + nonce (bytes)
     char payload[DH_KEY_SIZE + DH_KEY_SIZE + DH_NONCE_SIZE];
     memcpy(payload, prime_bytes, sizeof(prime_bytes));
     memcpy(payload + DH_KEY_SIZE, dhA_bytes, DH_KEY_SIZE);
-    memcpy(payload + DH_KEY_SIZE + DH_KEY_SIZE, nonce,
+    memcpy(payload + DH_KEY_SIZE + DH_KEY_SIZE, n0,
      DH_NONCE_SIZE);
 
     printf("[CLIENT] Sending payload to server of size %ld\n",
      sizeof(payload));
     gmp_printf("[CLIENT] p = %Zd, dhA = %Zd, nonce = %d\n", prime, dhA_mpz,
-     nonce[0]);
+     n0[0]);
 
     // print nonce
     for (int i = 0; i < DH_NONCE_SIZE; i++)
     {
-        printf("%d ", nonce[i]);
+        printf("%d ", n0[i]);
     }
+    printf("\n");
 
     send(socket, payload, sizeof(payload), 0);
 }
 
-
+void receive_server_hello(int socket, 
+mpz_t prime, 
+mpz_t dhA_mpz, 
+mpz_t a,
+gmp_randstate_t state){
+    // wait to receive a response from the server
+    char client_payload[DH_NUM_BITS + DH_KEY_SIZE + DH_NONCE_SIZE];
+    int payload_len = recv(socket, client_payload, 
+     sizeof(client_payload), 0);
+    printf("[CLIENT] Received payload from server of size %d\n", payload_len);
+    char dhB_bytes[DH_KEY_SIZE];
+    char n1[DH_NONCE_SIZE];
+    memcpy(dhB_bytes, client_payload, DH_KEY_SIZE);
+    memcpy(n1, client_payload + DH_KEY_SIZE, DH_NONCE_SIZE);
+    
+    printf("[CLIENT] Received nonce: ");
+    for (int i = 0; i < DH_NONCE_SIZE; i++)
+    {
+        printf("%d ", n1[i]);
+    }
+    printf("\n");
+}

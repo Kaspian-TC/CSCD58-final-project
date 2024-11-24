@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <gmp.h>
-
+#include "../shared_functions/helper_func.h"
 #include "server.h"
 #define SERVER_PORT 5432
 #define MAX_PENDING 5
@@ -156,11 +156,18 @@ void receive_client_hello(int socket, gmp_randstate_t state)
     mpz_export(dhB_bytes, NULL, 1, 1, 1, 0, dhB_mpz);
 
     // nonce is a random byte string of length DH_NONCE_SIZE
-    int n1[DH_NONCE_SIZE];
-    for (int i = 0; i < DH_NONCE_SIZE; i++)
+    char n1[DH_NONCE_SIZE];
+    /* for (int i = 0; i < DH_NONCE_SIZE; i++)
     {
         n1[i] = rand() % 256;
+    } */
+    get_random_bytes(n1, DH_NONCE_SIZE, state);
+    printf("[SERVER] sending nonce: ");
+    for (int i = 0; i < DH_NONCE_SIZE; i++)
+    {
+        printf("%d ", n1[i]);
     }
+    printf("\n");
 
     // create session key HDKF
     int session_key = 1234; // placeholder for session key

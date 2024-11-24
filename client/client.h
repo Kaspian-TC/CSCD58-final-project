@@ -3,7 +3,13 @@
 void send_client_hello(int socket, 
 mpz_t prime, 
 mpz_t dhA_mpz, 
-mpz_t a);
+mpz_t a,
+gmp_randstate_t state);
+void receive_server_hello(int socket, 
+mpz_t prime, 
+mpz_t dhA_mpz, 
+mpz_t a,
+gmp_randstate_t state);
 
 void initialize_values(mpz_t prime, mpz_t dhA_mpz, mpz_t a,
  gmp_randstate_t state);
