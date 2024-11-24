@@ -6,12 +6,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
-#define SERVER_PORT 5432
-#define MAX_LINE 256
-
-// Storage server hostnames
-const char* SERVER_IPS[] = {"server1", "server2", "server3"};
-const int NUM_SERVERS = 3;
+#include "router.h"
 
 // Function to retrieve all data from storage servers
 void retrieve_from_servers(int client_sock) {

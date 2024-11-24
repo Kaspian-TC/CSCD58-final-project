@@ -1,10 +1,7 @@
-#include <gmp.h>
-/* FUNCTION DECLARATIONS */
-void send_client_hello(int socket, 
-mpz_t prime, 
-mpz_t dhA_mpz, 
-mpz_t a);
+#define SERVER_PORT 5432
+#define MAX_LINE 256
 
-void initialize_values(mpz_t prime, mpz_t dhA_mpz, mpz_t a,
- gmp_randstate_t state);
-
+/* Function Headers */
+void send_data(int, const char* );
+void retrieve_data(int);
+int main(int, char**);
