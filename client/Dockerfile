@@ -1,13 +1,12 @@
 FROM gcc:latest
 
 # Set the working directory
-WORKDIR /app/client/
+WORKDIR /shared/client/
 
 # Copy the source code into the container
-COPY ./ /app/client/
+COPY client.c /shared/client/
 
 # Compile the source code into an executable
-RUN make
-
+# RUN gcc -o client client.c -lgmp -lm
 # Set the default command to run the client
 CMD ["./client"]
