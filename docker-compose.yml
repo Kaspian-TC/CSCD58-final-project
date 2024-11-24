@@ -14,11 +14,11 @@ services:
     volumes:
       - ./:/shared
 
-  # Router service (acts as server and router)
+  # Router service
   router:
     container_name: router
     build:
-      context: ./server
+      context: ./router # Updated to use the router folder
     networks:
       - app-network
     ports:
@@ -27,7 +27,7 @@ services:
       - server1
       - server2
       - server3
-    command: ["./server", "router"] # Pass "router" to indicate router mode
+    command: ["./router"] # Router executable
     tty: true
 
   # Storage server 1

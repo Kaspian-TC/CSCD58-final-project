@@ -24,63 +24,47 @@
 #define DH_NONCE_SIZE 16
 #define AES_KEY_SIZE 32
 
-const char* SERVER_IPS[] = {"server1", "server2", "server3"};
-const int NUM_SERVERS = 3;
-
-// Function to forward a single chunk of data to the appropriate storage server
-void forward_to_server(const char* server_ip, const char* payload) {
-    int sock = socket(AF_INET, SOCK_STREAM, 0);
-
-    if (sock < 0) {
-        perror("Socket creation failed");
-        exit(1);
-    }
-
-    struct sockaddr_in server;
-    server.sin_family = AF_INET;
-    server.sin_port = htons(SERVER_PORT);
-    inet_pton(AF_INET, server_ip, &server.sin_addr);
-
-    if (connect(sock, (struct sockaddr*)&server, sizeof(server)) < 0) {
-        perror("Connection to storage server failed");
-        close(sock);
-        exit(1);
-    }
-
-    send(sock, payload, strlen(payload), 0);
-    printf("[ROUTER] Forwarded chunk '%s' to server %s\n", payload, server_ip);
-    close(sock);
-}
-
-// Function to shard data and distribute chunks across servers
-void shard_and_distribute(const char* data) {
-    for (int i = 0; i < strlen(data); i++) {
-        char chunk[2] = {data[i], '\0'}; // Create a single-character chunk
-        const char* target_server = SERVER_IPS[i % NUM_SERVERS];
-        forward_to_server(target_server, chunk);
-    }
-}
-
-// Function to store data locally on the storage server
+// Function to store data locally
 void store_data(const char* payload) {
-    FILE* fp = fopen("data.txt", "a");
+    FILE* fp = fopen("data.txt", "a"); // Open file in append mode
     if (fp == NULL) {
-        perror("Failed to open storage file");
-        exit(1);
+        perror("[STORAGE] Failed to open or create data file");
+        return;
     }
 
-    fprintf(fp, "%s\n", payload);
+    fwrite(payload, sizeof(char), strlen(payload), fp); // Write raw data
     fclose(fp);
+
     printf("[STORAGE] Stored payload locally: %s\n", payload);
 }
 
-int main(int argc, char* argv[]) {
+// Function to retrieve stored data
+void retrieve_data(int socket) {
+    FILE* fp = fopen("data.txt", "r");
+    char buf[MAX_LINE];
+
+    if (fp == NULL) {
+        // Handle the missing file case
+        perror("[STORAGE] Data file does not exist, sending empty response.");
+        send(socket, "__END__", 7, 0); // Send end marker to indicate no data
+        return;
+    }
+
+    // Read and send file contents
+    while (fgets(buf, sizeof(buf), fp)) {
+        send(socket, buf, strlen(buf), 0);
+    }
+    fclose(fp);
+
+    // Send end marker to indicate completion
+    send(socket, "__END__", 7, 0);
+    printf("[STORAGE] Sent all data to router.\n");
+}
+
+int main() {
     struct sockaddr_in sin;
     char buf[MAX_LINE];
     int len, s, new_s;
-
-    // Determine if the server acts as a router or storage server
-    int is_router = (argc == 2 && strcmp(argv[1], "router") == 0);
 
     // Build address data structure
     bzero((char*)&sin, sizeof(sin));
@@ -89,22 +73,22 @@ int main(int argc, char* argv[]) {
     sin.sin_port = htons(SERVER_PORT);
 
     if ((s = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
-        perror("Socket creation failed");
+        perror("[STORAGE] Socket creation failed");
         exit(1);
     }
 
     if ((bind(s, (struct sockaddr*)&sin, sizeof(sin))) < 0) {
-        perror("Binding failed");
+        perror("[STORAGE] Binding failed");
         close(s);
         exit(1);
     }
 
-    listen(s, MAX_PENDING);
-    printf("[SERVER] %s started on port %d.\n", is_router ? "Router" : "Storage Server", SERVER_PORT);
+    listen(s, 5);
+    printf("[STORAGE] Listening on port %d...\n", SERVER_PORT);
 
     while (1) {
         if ((new_s = accept(s, (struct sockaddr*)&sin, &len)) < 0) {
-            perror("Accept failed");
+            perror("[STORAGE] Accept failed");
             close(s);
             exit(1);
         }
@@ -112,12 +96,12 @@ int main(int argc, char* argv[]) {
         len = recv(new_s, buf, sizeof(buf) - 1, 0);
         buf[len] = '\0';
 
-        if (is_router) {
-            printf("[ROUTER] Received data: %s\n", buf);
-            shard_and_distribute(buf); // Split and distribute data to storage servers
+        if (strcmp(buf, "GET_DATA") == 0) {
+            printf("[STORAGE] Received data retrieval request\n");
+            retrieve_data(new_s);
         } else {
             printf("[STORAGE] Received data: %s\n", buf);
-            store_data(buf); // Store the data locally
+            store_data(buf);
         }
 
         close(new_s);

@@ -17,6 +17,83 @@
 // test comment
 // another test commment
 
+void send_data(int socket, const char* data) {
+    send(socket, data, strlen(data), 0);
+    printf("[CLIENT] Sent: %s\n", data);
+}
+
+void retrieve_data(int socket) {
+    char buf[MAX_LINE];
+    int len;
+
+    send_data(socket, "RETRIEVE");
+    printf("[CLIENT] Sent retrieval request\n");
+
+    // Receive data from the server
+    printf("[CLIENT] Received data:\n");
+    while ((len = recv(socket, buf, MAX_LINE - 1, 0)) > 0) {
+        buf[len] = '\0';
+        printf("%s", buf);
+    }
+    printf("\n[CLIENT] Data retrieval complete\n");
+}
+
+int main(int argc, char* argv[]) {
+    struct hostent* hp;
+    struct sockaddr_in sin;
+    char* host;
+    int s;
+
+    if (argc != 3 || (strcmp(argv[1], "--store") != 0 && strcmp(argv[1], "--retrieve") != 0)) {
+        fprintf(stderr, "Usage: %s --store|--retrieve <router_host>\n", argv[0]);
+        exit(1);
+    }
+
+    char* mode = argv[1];
+    host = argv[2];
+
+    // Translate host name into peer's IP address
+    hp = gethostbyname(host);
+    if (!hp) {
+        fprintf(stderr, "simplex-talk: unknown host: %s\n", host);
+        exit(1);
+    }
+
+    // Build address data structure
+    bzero((char*)&sin, sizeof(sin));
+    sin.sin_family = AF_INET;
+    bcopy(hp->h_addr, (char*)&sin.sin_addr, hp->h_length);
+    sin.sin_port = htons(SERVER_PORT);
+
+    // Active open
+    if ((s = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
+        perror("simplex-talk: socket");
+        exit(1);
+    }
+    if (connect(s, (struct sockaddr*)&sin, sizeof(sin)) < 0) {
+        perror("simplex-talk: connect");
+        close(s);
+        exit(1);
+    }
+
+    printf("[CLIENT] Connected to server at %s\n", host);
+
+    if (strcmp(mode, "--store") == 0) {
+        // Generate and send a random string
+        srand(time(NULL));
+        char random_string[MAX_LINE];
+        snprintf(random_string, sizeof(random_string), "RandomData_%d", rand());
+        send_data(s, random_string);
+    } else if (strcmp(mode, "--retrieve") == 0) {
+        // Retrieve data from the router
+        retrieve_data(s);
+    }
+
+    close(s);
+    return 0;
+}
+
+/* PREVIOUS IMPLEMENTATION */
 void get_big_prime(mpz_t prime, gmp_randstate_t state)
 {
     // mpz_t z;
@@ -33,7 +110,7 @@ void get_big_prime(mpz_t prime, gmp_randstate_t state)
 }
 
 
-
+/*
 int main(int argc, char *argv[])
 {
     
@@ -53,7 +130,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "usage: simplex-talk host\n");
         exit(1);
     }
-    /* translate host name into peer’s IP address */
+    // translate host name into peer’s IP address
     hp = gethostbyname(host);
     if (!hp)
     {
@@ -61,12 +138,12 @@ int main(int argc, char *argv[])
                 host);
         exit(1);
     }
-    /* build address data structure */
+    // build address data structure
     bzero((char *)&sin, sizeof(sin));
     sin.sin_family = AF_INET;
     bcopy(hp->h_addr, (char *)&sin.sin_addr, hp->h_length);
     sin.sin_port = htons(SERVER_PORT);
-    /* active open */
+    
     if ((s = socket(PF_INET, SOCK_STREAM, 0)) < 0)
     {
         perror("simplex-talk: socket");
@@ -79,7 +156,7 @@ int main(int argc, char *argv[])
         close(s);
         exit(1);
     }
-    /* main loop: get and send lines of text */
+    // main loop: get and send lines of text
     printf("has connected to server at %s\n", host);
 
     // set state for random number generation (mercenene twister)
@@ -97,22 +174,23 @@ int main(int argc, char *argv[])
     return 0;
 
 
-    /* while (fgets(buf, sizeof(buf), stdin))
-    {
-        len = strlen(buf) + 1;
-        send(s, buf, len, 0);
+    // while (fgets(buf, sizeof(buf), stdin))
+    // {
+    //     len = strlen(buf) + 1;
+    //     send(s, buf, len, 0);
 
-        char buf_2[MAX_LINE+60];
-        buf_2[MAX_LINE + 60 - 1] = '\0';
-        len = recv(s, buf_2, sizeof(buf_2), 0);
-        printf("%s",buf_2);
-		if (strcmp(buf, ">>> Ciao-Ciao\n") == 0 || strcmp(buf, "Ciao-Ciao\n") == 0)
-		{
-			close(s);
-			return 0;
-		}
-	} */
+    //     char buf_2[MAX_LINE+60];
+    //     buf_2[MAX_LINE + 60 - 1] = '\0';
+    //     len = recv(s, buf_2, sizeof(buf_2), 0);
+    //     printf("%s",buf_2);
+	// 	if (strcmp(buf, ">>> Ciao-Ciao\n") == 0 || strcmp(buf, "Ciao-Ciao\n") == 0)
+	// 	{
+	// 		close(s);
+	// 		return 0;
+	// 	}
+	// } 
 }
+*/
 
 // TLS IMPLEMENTATION - Client side
 // Diffie-Hellman key exchange

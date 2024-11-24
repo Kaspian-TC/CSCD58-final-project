@@ -9,7 +9,7 @@ COPY server.h .
 COPY Makefile .
 
 # Compile the source code into an executable
-RUN make  # Build the `server` executable
+RUN make
 
 # Expose the server port
 EXPOSE 5432
