@@ -9,6 +9,8 @@
 #include <unistd.h>
 #include <time.h>
 #include <gmp.h>
+#include "../shared_functions/helper_func.h"
+#include "../shared_functions/key_exchange.h"
 #include <openssl/evp.h>
 #include <openssl/kdf.h>
 #include <openssl/params.h>
@@ -76,10 +78,10 @@ int main()
         printf("[SERVER] Connection established.\n");
 
         // the client is sending the payload for Diffie-Hellman key exchange
-        // for now, lets just recieve the payload and print it
-
-        receive_client_hello(new_s, state);
-
+        char master_key[256];
+        server_get_master_key(new_s, master_key, state);
+        // print out master key
+        print_bytes(master_key, 256);
         // close the connection
         close(new_s);
 
@@ -91,113 +93,6 @@ int main()
     return 0;
 }
 
-// TLS IMPLEMENTATION - Server side
-
-
-
-// Diffie-Hellman key exchange
-void receive_client_hello(int socket, gmp_randstate_t state)
-{
-    // receive p, dhA, nonce from client
-    char client_payload[DH_NUM_BITS + DH_KEY_SIZE + DH_NONCE_SIZE];
-    int payload_len = recv(socket, client_payload, sizeof(client_payload), 0);
-    printf("[SERVER] Received payload of size %d\n", payload_len);
-
-    // payload is in the format p (bytes) + dhA (bytes) + nonce (bytes)
-    // extract p, dhA, nonce from payload
-    int p;
-    int dhA;
-    char n0[DH_NONCE_SIZE];
-    // use mpz_import to convert back to mpz_t
-    
-    char dhA_bytes[DH_KEY_SIZE];
-    char prime_bytes[DH_KEY_SIZE];
-
-    memcpy(prime_bytes, client_payload, DH_KEY_SIZE);
-    memcpy(dhA_bytes, client_payload + DH_KEY_SIZE, DH_KEY_SIZE);
-    memcpy(n0, client_payload + DH_KEY_SIZE + DH_KEY_SIZE, DH_NONCE_SIZE);
-
-    mpz_t prime;
-    mpz_init2(prime,DH_NUM_BITS);
-    mpz_import(prime, DH_KEY_SIZE, 1, 1, 1, 0, prime_bytes);
-    
-    mpz_t dhA_mpz;
-    mpz_init2(dhA_mpz,DH_NUM_BITS);
-    mpz_import(dhA_mpz, DH_KEY_SIZE, 1, 1, 1, 0, dhA_bytes);
-
-    gmp_printf("dhB_mpz: %Zd\n", dhA_mpz); // this is a test
-    gmp_printf("[SERVER] Received p = %Zd, dhA = %Zd, nonce = %d\n", prime, dhA_mpz, n0[0]);
-
-    // print n0
-    printf("[SERVER] Received nonce: ");
-    for (int i = 0; i < DH_NONCE_SIZE; i++)
-    {
-        printf("%d ", n0[i]);
-    }
-    printf("\n");
-    
-    
-    
-    mpz_t b;
-    mpz_t g;
-    mpz_inits(b,g,NULL);
-    
-    mpz_t dhB_mpz;
-    mpz_init2(dhB_mpz,DH_NUM_BITS);
-    mpz_urandomb(b, state, DH_NUM_BITS);
-
-    mpz_set_ui(g,DH_G);
-
-    mpz_powm(dhB_mpz,g,b,prime); // dhB = g^b mod p
-    // int dhB = (int)pow(DH_G, b) % p;
-
-    mpz_t master_key;
-    mpz_init(master_key);
-    mpz_powm(master_key,dhB_mpz,b,prime); // m = dhA^b mod p
-    // int m = (int)pow(dhA, b) % p;
-
-    gmp_printf("[SERVER] Calculated dhB = %Zd, master key = %Zd\n", dhB_mpz, master_key);
-    // convert dhB to string of bytes
-    char dhB_bytes[DH_KEY_SIZE];
-    mpz_export(dhB_bytes, NULL, 1, 1, 1, 0, dhB_mpz);
-
-    // nonce is a random byte string of length DH_NONCE_SIZE
-    int n1[DH_NONCE_SIZE];
-    for (int i = 0; i < DH_NONCE_SIZE; i++)
-    {
-        n1[i] = rand() % 256;
-    }
-
-    // create session key HDKF
-    unsigned char salt[DH_NONCE_SIZE*2];
-    memcpy(salt, n0, DH_NONCE_SIZE);
-    memcpy(salt + DH_NONCE_SIZE, n1, DH_NONCE_SIZE);
-    printf("[SERVER] Salt: ");
-    for (int i = 0; i < strlen(salt); i++)
-    {
-        printf("%d ", salt[i]);
-    }
-
-    unsigned char master_key_bytes[DH_KEY_SIZE];
-    mpz_export(master_key_bytes, NULL, 1, 1, 1, 0, master_key);
-    unsigned char *session_key = create_session_key(master_key_bytes, salt);
-    printf("[SERVER] Session key: ");
-    for (int i = 0; i < AES_KEY_SIZE; i++)
-    {
-        printf("%02x", session_key[i]);
-    }
-    printf("size of session key: %ld\n", sizeof(session_key));
-
-
-    // send dhB, nonce to client
-    // payload = dhB (bytes) + nonce (bytes)
-    char server_payload[DH_KEY_SIZE + DH_NONCE_SIZE];
-    memcpy(server_payload, dhB_bytes, DH_KEY_SIZE);
-    memcpy(server_payload + DH_KEY_SIZE, n1, DH_NONCE_SIZE);
-
-    printf("[SERVER] Sending payload to client of size %ld\n", sizeof(server_payload));
-    send(socket, server_payload, sizeof(server_payload), 0);
-}
 
 // create the session key using HKDF 
 unsigned char *create_session_key(unsigned char *master_key, unsigned char *salt)

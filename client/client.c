@@ -9,7 +9,8 @@
 #include <unistd.h>
 #include <gmp.h>
 #include <time.h>
-
+#include "../shared_functions/helper_func.h"
+#include "../shared_functions/key_exchange.h"
 #include "client.h"
 
 #define SERVER_PORT 5432
@@ -17,26 +18,8 @@
 // test comment
 // another test commment
 
-void get_big_prime(mpz_t prime, gmp_randstate_t state)
-{
-    // mpz_t z;
-    // gmp_printf ("%s is an mpz %Zd\n", "here", z);
-    mpz_t random_number;
-    mpz_init(random_number);
-    mpz_urandomb(random_number, state, 2048);
-
-    mpz_nextprime(prime, random_number);
-    
-    mpz_clear(random_number);
-    // mpz_nextprime(prime, 2);
-    
-}
-
-
-
 int main(int argc, char *argv[])
 {
-    
     FILE *fp;
     struct hostent *hp;
     struct sockaddr_in sin;
@@ -87,13 +70,13 @@ int main(int argc, char *argv[])
     // when done with state
     gmp_randinit_mt(state);
     gmp_randseed_ui(state, time(NULL));
-
-    
-    mpz_t prime, dhA_mpz, a;
-    initialize_values(prime, dhA_mpz, a, state);
-    send_client_hello(s,prime, dhA_mpz, a);
+    char master_key[256];
+    client_get_master_key(s, master_key, state);
+    // print out master key
+    print_bytes(master_key, 256);
     // close the connection
     close(s);
+    gmp_randclear(state); 
     return 0;
 
 
@@ -113,85 +96,3 @@ int main(int argc, char *argv[])
 		}
 	} */
 }
-
-// TLS IMPLEMENTATION - Client side
-// Diffie-Hellman key exchange
-// Client creates p using fixed g such that g is coprime to p-1
-// client creates a secret number a and computes dhA = g^a mod p
-// client creates a nonce and sends p, dhA, nonce to server
-
-#define BUFFER_SIZE 1048576 // 1 MB
-#define DH_NUM_BITS 2048
-#define DH_G 5
-#define DH_KEY_SIZE 256
-#define DH_NONCE_SIZE 16
-#define AES_KEY_SIZE 32
-
-void initialize_values(mpz_t prime, mpz_t dhA_mpz, mpz_t a,
- gmp_randstate_t state){
-    mpz_t g;
-    mpz_inits(a,g,NULL);
-    
-    mpz_init2(dhA_mpz,DH_NUM_BITS);
-    mpz_init2(prime,DH_NUM_BITS);//make sure to call mpz_clear(); after using
-    
-    get_big_prime(prime,state);
-
-    gmp_printf("Prime number: %Zd\n", prime);
-
-    mpz_urandomb(a, state, DH_NUM_BITS);
-    // compute dhA = g^a mod p
-    // initialize g 
-    mpz_set_ui(g,DH_G);
-
-    mpz_powm(dhA_mpz,g,a,prime); // dhA = g^a mod p
-    mpz_clear(g);
-}
-
-// send_client_hello function contains all information passed to command line
-// we want to generate p, a, dhA, nonce and send it to server as payload
-void send_client_hello(int socket,
- mpz_t prime, 
- mpz_t dhA_mpz, 
- mpz_t a){
-
-    // convert dhA to string of bytes
-    char dhA_bytes[DH_KEY_SIZE];
-    /* array, count (# of words produced), size(bytes per), order(set 1), endian 
-    (1 for big, -1 for little, 0 for native cpu), nails (The number of most 
-     significant bits to skip), op (The integer to convert)
-    */
-    mpz_export(dhA_bytes, NULL, 1, 1, 1, 0, dhA_mpz);
-    char prime_bytes[DH_KEY_SIZE];
-    mpz_export(prime_bytes, NULL, 1, 1, 1, 0, prime);
-    
-    // nonce is a random byte string of length DH_NONCE_SIZE
-    char nonce[DH_NONCE_SIZE];
-    for (int i = 0; i < DH_NONCE_SIZE; i++)
-    {
-        nonce[i] = rand() % 256;
-    }
-
-    // send p, dhA, nonce to server
-    // payload = p (bytes) + dhA (bytes) + nonce (bytes)
-    char payload[DH_KEY_SIZE + DH_KEY_SIZE + DH_NONCE_SIZE];
-    memcpy(payload, prime_bytes, sizeof(prime_bytes));
-    memcpy(payload + DH_KEY_SIZE, dhA_bytes, DH_KEY_SIZE);
-    memcpy(payload + DH_KEY_SIZE + DH_KEY_SIZE, nonce,
-     DH_NONCE_SIZE);
-
-    printf("[CLIENT] Sending payload to server of size %ld\n",
-     sizeof(payload));
-    gmp_printf("[CLIENT] p = %Zd, dhA = %Zd, nonce = %d\n", prime, dhA_mpz,
-     nonce[0]);
-
-    // print nonce
-    for (int i = 0; i < DH_NONCE_SIZE; i++)
-    {
-        printf("%d ", nonce[i]);
-    }
-
-    send(socket, payload, sizeof(payload), 0);
-}
-
-
