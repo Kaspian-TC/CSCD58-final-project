@@ -1,5 +1,5 @@
 #include <gmp.h>
-
+#include <stdio.h>	
 #define BUFFER_SIZE 1048576 // 1 MB
 #define DH_NUM_BITS 2048
 #define DH_G 5
@@ -15,14 +15,13 @@ void get_random_bytes(char *bytes, int length,gmp_randstate_t state)
     mpz_export(bytes, NULL, 1, 1, 1, 0, random_number);
 }
 
-void initialize_values(mpz_t prime, mpz_t dh, mpz_t secret,
+void initialize_values(const mpz_t prime, mpz_t dh, mpz_t secret,
  gmp_randstate_t state){
     mpz_t g;
     mpz_inits(secret,g,NULL);
     
     mpz_init2(dh,DH_NUM_BITS);
     
-
     gmp_printf("Prime number: %Zd\n", prime);
 
     mpz_urandomb(secret, state, DH_NUM_BITS);
@@ -32,4 +31,13 @@ void initialize_values(mpz_t prime, mpz_t dh, mpz_t secret,
 
     mpz_powm(dh,g,secret,prime); // dhA = g^a mod p
     mpz_clear(g);
+}
+
+void print_bytes(char *bytes, int length)
+{
+	for (int i = 0; i < length; i++)
+	{
+		printf("%d ", bytes[i]);
+	}
+	printf("\n");
 }
