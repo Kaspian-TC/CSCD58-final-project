@@ -1,5 +1,5 @@
 FLAGS = -Os
-LINKED_LIBS = -lgmp -lm
+LINKED_LIBS = -lgmp -lm -lssl -lcrypto
 HELPER_FOLDER = ../shared_functions
 SOURCES = client.c $(HELPER_FOLDER)/helper_func.c $(HELPER_FOLDER)/key_exchange.c
 OBJECTS = $(SOURCES:.c=.o)

@@ -5,6 +5,12 @@
 #include "helper_func.h"
 #include "key_exchange.h"
 
+#include <openssl/evp.h>
+#include <openssl/kdf.h>
+#include <openssl/params.h>
+#include <openssl/err.h>
+
+
 // TLS IMPLEMENTATION - Client side
 // Diffie-Hellman key exchange
 // Client creates p using fixed g such that g is coprime to p-1
@@ -123,7 +129,7 @@ char * client_get_master_key(int socket, char * master_key /* assumed 256 length
 // TLS IMPLEMENTATION - Server side
 
 // Diffie-Hellman key exchange
-void receive_client_hello(int socket, mpz_t prime, mpz_t dhA_mpz, gmp_randstate_t state)
+void receive_client_hello(int socket, mpz_t prime, mpz_t dhA_mpz, gmp_randstate_t state,char* n0,char* n1)
 {
     // receive p, dhA, nonce from client
     char client_payload[DH_NUM_BITS + DH_KEY_SIZE + DH_NONCE_SIZE];
@@ -135,7 +141,7 @@ void receive_client_hello(int socket, mpz_t prime, mpz_t dhA_mpz, gmp_randstate_
     // extract p, dhA, nonce from payload
     int p;
     int dhA;
-    char n0[DH_NONCE_SIZE];
+    
     // use mpz_import to convert back to mpz_t
     
     char dhA_bytes[DH_KEY_SIZE];
@@ -166,7 +172,8 @@ void receive_client_hello(int socket, mpz_t prime, mpz_t dhA_mpz, gmp_randstate_
 char * send_server_hello(int socket,
  mpz_t prime, 
  mpz_t dhA_mpz, 
- gmp_randstate_t state, char * master_key_bytes /* assume 256 bytes */){
+ gmp_randstate_t state, char * master_key_bytes /* assume 256 bytes */,
+ char * n0, char * n1){
     mpz_t b, g, dhB_mpz;
     initialize_values(prime,dhB_mpz,b,state);
     
@@ -175,6 +182,23 @@ char * send_server_hello(int socket,
     mpz_powm(master_key,dhA_mpz,b,prime); // m = dhA^b mod p
     // convert master key to bytes
     mpz_export(master_key_bytes, NULL, 1, 1, 1, 0, master_key);
+
+        unsigned char salt[DH_NONCE_SIZE*2];
+    memcpy(salt, n0, DH_NONCE_SIZE);
+    memcpy(salt + DH_NONCE_SIZE, n1, DH_NONCE_SIZE);
+    printf("[SERVER] Salt: ");
+    for (int i = 0; i < strlen(salt); i++)
+    {
+        printf("%d ", salt[i]);
+    }
+
+    unsigned char *session_key = create_session_key(master_key_bytes, salt);
+    printf("[SERVER] Session key: ");
+    for (int i = 0; i < AES_KEY_SIZE; i++)
+    {
+        printf("%02x", session_key[i]);
+    }
+    printf("size of session key: %ld\n", sizeof(session_key));
     
     // int m = (int)pow(dhA, b) % p;
 
@@ -183,8 +207,6 @@ char * send_server_hello(int socket,
     char dhB_bytes[DH_KEY_SIZE];
     mpz_export(dhB_bytes, NULL, 1, 1, 1, 0, dhB_mpz);
 
-    // nonce is a random byte string of length DH_NONCE_SIZE
-    char n1[DH_NONCE_SIZE];
     /* for (int i = 0; i < DH_NONCE_SIZE; i++)
     {
         n1[i] = rand() % 256;
@@ -197,8 +219,6 @@ char * send_server_hello(int socket,
     }
     printf("\n");
 
-    // create session key HDKF
-    int session_key = 1234; // placeholder for session key
 
     // send dhB, nonce to client
     // payload = dhB (bytes) + nonce (bytes)
@@ -215,10 +235,62 @@ char * send_server_hello(int socket,
 
 char * server_get_master_key(int socket, char * master_key /* assumed 256 length */,
  gmp_randstate_t state){
+    char n0[DH_NONCE_SIZE];
+    char n1[DH_NONCE_SIZE];
     mpz_t prime;
     mpz_t dhA_mpz;
-    receive_client_hello(socket, prime, dhA_mpz, state);
-    send_server_hello(socket,prime,dhA_mpz,state,master_key);
+    receive_client_hello(socket, prime, dhA_mpz, state, n0,n1);
+    send_server_hello(socket,prime,dhA_mpz,state,master_key,n0,n1);
     mpz_clears(prime,dhA_mpz,NULL);
     return master_key;
  }
+
+// create the session key using HKDF 
+unsigned char *create_session_key(unsigned char *master_key, unsigned char *salt)
+{
+    static unsigned char session_key[AES_KEY_SIZE];
+    EVP_KDF *kdf;
+    EVP_KDF_CTX *kctx;
+    OSSL_PARAM params[5], *p = params;
+
+    // Find and allocate the HKDF algorithm
+    if ((kdf = EVP_KDF_fetch(NULL, "HKDF", NULL)) == NULL)
+    {
+        perror("Error fetching HKDF algorithm\n");
+    }
+    kctx = EVP_KDF_CTX_new(kdf);
+    EVP_KDF_free(kdf);
+    if (kctx == NULL)
+    {
+        perror("Error creating KDF context\n");
+    }
+
+    // Set the parameters for the HKDF algorithm
+    *p++ = OSSL_PARAM_construct_utf8_string("digest", "SHA256", strlen("SHA256"));
+    *p++ = OSSL_PARAM_construct_octet_string("key", master_key, strlen(master_key));
+    *p++ = OSSL_PARAM_construct_octet_string("salt", salt, strlen(salt));
+    *p++ = OSSL_PARAM_construct_octet_string("info", "Session key", strlen("Session key"));
+    *p = OSSL_PARAM_construct_end();
+
+    if (EVP_KDF_CTX_set_params(kctx, params) <= 0)
+    {
+        perror("Error setting KDF parameters\n");
+        ERR_print_errors_fp(stderr);
+    }
+
+    // Derive the session key
+    if (EVP_KDF_derive(kctx, session_key, AES_KEY_SIZE, params) <= 0)
+    {
+        perror("Error deriving session key\n");
+        ERR_print_errors_fp(stderr);
+    }
+    EVP_KDF_CTX_free(kctx);
+    printf("Session key: ");
+    for (int i = 0; i < AES_KEY_SIZE; i++)
+    {
+        printf("%02x", session_key[i]);
+    }
+    printf("length of session key: %ld\n", sizeof(session_key));
+    return session_key;
+
+}

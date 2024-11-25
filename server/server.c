@@ -79,6 +79,7 @@ int main()
 
         // the client is sending the payload for Diffie-Hellman key exchange
         char master_key[256];
+        
         server_get_master_key(new_s, master_key, state);
         // print out master key
         print_bytes(master_key, 256);
@@ -94,7 +95,7 @@ int main()
 }
 
 
-// create the session key using HKDF 
+/* // create the session key using HKDF 
 unsigned char *create_session_key(unsigned char *master_key, unsigned char *salt)
 {
     static unsigned char session_key[AES_KEY_SIZE];
@@ -142,4 +143,4 @@ unsigned char *create_session_key(unsigned char *master_key, unsigned char *salt
     printf("length of session key: %ld\n", sizeof(session_key));
     return session_key;
 
-}
+} */
