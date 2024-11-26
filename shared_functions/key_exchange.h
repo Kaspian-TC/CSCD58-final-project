@@ -13,4 +13,3 @@ char * send_server_hello(int socket,
  char * n0, char * n1);
 char * server_get_master_key(int socket, char * master_key /* assumed 256 length */,
  gmp_randstate_t state);
- unsigned char *create_session_key(unsigned char *master_key, unsigned char *salt);

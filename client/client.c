@@ -72,8 +72,6 @@ int main(int argc, char *argv[])
     gmp_randseed_ui(state, time(NULL));
     char master_key[256];
     client_get_master_key(s, master_key, state);
-    // print out master key
-    print_bytes(master_key, 256);
     // close the connection
     close(s);
     gmp_randclear(state); 
