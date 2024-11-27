@@ -8,10 +8,12 @@
 
 #include "router.h"
 
+static int current_server_index = 0; // To keep track of the next server to store data
+
 // Function to retrieve all data from storage servers
 void retrieve_from_servers(int client_sock) {
     char buf[MAX_LINE];
-    char final_payload[MAX_LINE * NUM_SERVERS]; // To hold the concatenated data
+    char final_payload[MAX_LINE * NUM_SERVERS]; // To hold concatenated data
     int len;
 
     // Initialize the final payload
@@ -50,31 +52,19 @@ void retrieve_from_servers(int client_sock) {
         while ((len = recv(sock, buf, MAX_LINE - 1, 0)) > 0) {
             buf[len] = '\0';
 
-            // Remove any `__END__` markers from the received data
-            char* end_marker_pos = strstr(buf, "__END__");
-            if (end_marker_pos != NULL) {
-                *end_marker_pos = '\0'; // Truncate the string at `__END__`
-            }
-
-            // Append cleaned data to the final payload
+            // Append received data to the final payload
             strncat(final_payload, buf, sizeof(final_payload) - strlen(final_payload) - 1);
-
-            printf("[ROUTER] Received chunk from server %s: %s\n", SERVER_IPS[i], buf);
         }
 
         close(sock);
     }
 
-    // Debug: Final payload before sending to client
-    printf("[ROUTER] Final concatenated payload (before sending): %s\n", final_payload);
-
     // Send the final payload to the client
     send(client_sock, final_payload, strlen(final_payload), 0);
-
-    printf("[ROUTER] Sent final payload to client.\n");
+    printf("[ROUTER] Sent concatenated data to client.\n");
 }
 
-// Function to forward a chunk of data to a storage server
+// Function to forward a block of data to a storage server
 void forward_to_server(const char* server_name, const char* payload) {
     struct hostent* hp;
     struct sockaddr_in server;
@@ -107,29 +97,21 @@ void forward_to_server(const char* server_name, const char* payload) {
         return;
     }
 
-    // Send data chunk to server
+    // Send data block to the server
     send(sock, payload, strlen(payload), 0);
-    printf("[ROUTER] Forwarded chunk '%s' to server %s\n", payload, server_name);
+    printf("[ROUTER] Sent block '%s' to server %s\n", payload, server_name);
     close(sock);
 }
 
-// Function to shard data into chunks and distribute across servers
-void shard_and_distribute(const char* data) {
-    int data_len = strlen(data);
-    int chunk_size = (data_len + NUM_SERVERS - 1) / NUM_SERVERS; // Divide data into chunks
+// Function to distribute data across servers in a round-robin manner
+void distribute_to_server(const char* data) {
+    const char* target_server = SERVER_IPS[current_server_index];
 
-    for (int i = 0; i < NUM_SERVERS; i++) {
-        int start = i * chunk_size;
-        int end = (i + 1) * chunk_size;
-        if (start >= data_len) break; // No more data to send
-        if (end > data_len) end = data_len;
+    // Send the full block to the chosen server
+    forward_to_server(target_server, data);
 
-        char chunk[MAX_LINE];
-        strncpy(chunk, &data[start], end - start);
-        chunk[end - start] = '\0';
-
-        forward_to_server(SERVER_IPS[i], chunk);
-    }
+    // Move to the next server in a round-robin fashion
+    current_server_index = (current_server_index + 1) % NUM_SERVERS;
 }
 
 int main() {
@@ -172,7 +154,7 @@ int main() {
             retrieve_from_servers(new_s);
         } else {
             printf("[ROUTER] Received data: %s\n", buf);
-            shard_and_distribute(buf); // Split and distribute data to storage servers
+            distribute_to_server(buf); // Send data to a single server
         }
 
         close(new_s);

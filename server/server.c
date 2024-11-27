@@ -1,53 +1,49 @@
 #include <stdio.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <time.h>
-#include <gmp.h>
-#include <arpa/inet.h>
-
+#include <netinet/in.h>
 #include "server.h"
 
-// Function to store data locally
+// Function to store data locally in separate files for each block
 void store_data(const char* payload) {
-    FILE* fp = fopen("data.txt", "a"); // Open file in append mode
+    static int block_id = 1; // Incremental block IDs
+    char filename[64];
+    snprintf(filename, sizeof(filename), "block%d.txt", block_id);
+
+    FILE* fp = fopen(filename, "w");
     if (fp == NULL) {
-        perror("[STORAGE] Failed to open or create data file");
+        perror("[STORAGE] Failed to create block file");
         return;
     }
 
-    fwrite(payload, sizeof(char), strlen(payload), fp); // Write raw data
+    fprintf(fp, "%s\n", payload);
     fclose(fp);
 
-    printf("[STORAGE] Stored payload locally: %s\n", payload);
+    printf("[STORAGE] Stored block in %s\n", filename);
+    block_id++;
 }
 
-// Function to retrieve stored data
+// Function to retrieve all stored blocks
 void retrieve_data(int socket) {
-    FILE* fp = fopen("data.txt", "r");
     char buf[MAX_LINE];
+    char final_payload[MAX_LINE * 100] = {0};
 
-    if (fp == NULL) {
-        // Handle the missing file case
-        perror("[STORAGE] Data file does not exist, sending empty response.");
-        send(socket, "__END__", 7, 0); // Send end marker to indicate no data
-        return;
+    for (int i = 1; i <= 100; i++) { // Assume a maximum of 100 blocks
+        char filename[64];
+        snprintf(filename, sizeof(filename), "block%d.txt", i);
+
+        FILE* fp = fopen(filename, "r");
+        if (fp == NULL) break; // Stop if no more blocks
+
+        while (fgets(buf, sizeof(buf), fp)) {
+            strcat(final_payload, buf);
+        }
+        fclose(fp);
     }
 
-    // Read and send file contents
-    while (fgets(buf, sizeof(buf), fp)) {
-        send(socket, buf, strlen(buf), 0);
-    }
-    fclose(fp);
-
-    // Send end marker to indicate completion
-    send(socket, "__END__", 7, 0);
-    printf("[STORAGE] Sent all data to router.\n");
+    send(socket, final_payload, strlen(final_payload), 0);
+    printf("[STORAGE] Sent all stored blocks.\n");
 }
 
 int main() {
