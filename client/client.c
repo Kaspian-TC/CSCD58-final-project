@@ -12,6 +12,7 @@
 #include "../shared_functions/helper_func.h"
 #include "../shared_functions/key_exchange.h"
 #include "client.h"
+#include "../shared_functions/certificates.h"
 
 #define SERVER_PORT 5432
 #define MAX_LINE 256
@@ -72,6 +73,20 @@ int main(int argc, char *argv[])
     gmp_randseed_ui(state, time(NULL));
     char master_key[256];
     client_get_master_key(s, master_key, state);
+
+    
+    const char *private_key_file = "./keys/private.pem";
+    const char *data = "This is the data to be signed";
+    long data_len = strlen(data);
+    char * signature;
+    size_t signed_len;
+    sign_test_data(private_key_file, data, data_len,&signature,&signed_len);
+    // print the signature
+    printf("Signed length: %ld\n", signed_len);
+    const char *public_key_file = "./keys/public.pem";
+    check_signed_data(public_key_file, data, data_len, signature, signed_len);
+    
+    
     // close the connection
     close(s);
     gmp_randclear(state); 

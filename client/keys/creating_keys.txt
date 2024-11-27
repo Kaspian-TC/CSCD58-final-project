@@ -1,0 +1,6 @@
+generate private key using:
+`openssl genrsa -des3 -out private.pem 2048`
+
+generate public key from private key using 
+`openssl rsa -in private.pem -outform PEM -pubout -out public.pem`
+
