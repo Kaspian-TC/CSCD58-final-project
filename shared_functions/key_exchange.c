@@ -1,9 +1,10 @@
 #include <gmp.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include "helper_func.h"
-
+#include "certificates.h"
 
 
 
@@ -74,6 +75,33 @@ void send_client_hello(int socket,
     send(socket, payload, sizeof(payload), 0);
 }
 
+/* Helper function for receive_server_hello */
+static int is_server_response_certificate_valid(
+    char* n0,char* n1,char* dhA_bytes,char* dhB_bytes,char* signature){
+
+    // make data n0 + n1 + dhA + dhB + certificate (not there yet)
+    char data[DH_NONCE_SIZE*2 + DH_KEY_SIZE*2];
+    long data_len = DH_NONCE_SIZE*2 + DH_KEY_SIZE*2;
+    memcpy(data, n0, DH_NONCE_SIZE);
+    memcpy(data + DH_NONCE_SIZE, n1, DH_NONCE_SIZE);
+    memcpy(data + DH_NONCE_SIZE*2, dhA_bytes, DH_KEY_SIZE);
+    memcpy(data + DH_NONCE_SIZE*2 + DH_KEY_SIZE, dhB_bytes, DH_KEY_SIZE);
+
+    print_bytes(data, data_len);
+    // veryify the signature
+    const char *public_key_file = "./keys/server.pem"; // should be the same for both client and server
+    int valid = validate_signed_data(public_key_file, data, data_len, signature, 256);
+    if (valid == 1)
+    {
+        printf("[CLIENT] Signature is valid\n");
+    }
+    else
+    {
+        printf("[CLIENT] Signature is invalid\n");
+    }
+    return valid;
+}
+
 char * receive_server_hello(int socket, 
 mpz_t prime, 
 mpz_t dhA_mpz, 
@@ -83,13 +111,15 @@ char * master_key_bytes,
 char * n0, 
 char * n1){
     // wait to receive a response from the server
-    char client_payload[DH_NUM_BITS + DH_KEY_SIZE + DH_NONCE_SIZE];
+    char client_payload[DH_KEY_SIZE + DH_NONCE_SIZE + 256];
     int payload_len = recv(socket, client_payload, 
      sizeof(client_payload), 0);
     printf("[CLIENT] Received payload from server of size %d\n", payload_len);
     char dhB_bytes[DH_KEY_SIZE];
+    char signature[256]; //TODO: change this to a constant
     memcpy(dhB_bytes, client_payload, DH_KEY_SIZE);
     memcpy(n1, client_payload + DH_KEY_SIZE, DH_NONCE_SIZE);
+    memcpy(signature, client_payload + DH_KEY_SIZE + DH_NONCE_SIZE, 256);
     
     mpz_t dhB_mpz;
     mpz_init2(dhB_mpz,DH_NUM_BITS);
@@ -115,6 +145,10 @@ char * n1){
     print_bytes(session_key, AES_KEY_SIZE);
     printf("size of session key: %ld\n", sizeof(session_key));
 
+
+    char dhA_bytes[DH_KEY_SIZE];
+    mpz_export(dhA_bytes, NULL, 1, 1, 1, 0, dhA_mpz);
+    is_server_response_certificate_valid(n0,n1,dhA_bytes,dhB_bytes,signature);
 	return master_key_bytes;
 }
 
@@ -214,16 +248,43 @@ char * send_server_hello(int socket,
     print_bytes(session_key, AES_KEY_SIZE);
     printf("size of session key: %ld\n", sizeof(session_key));
 
+
+    // convert dhA to string of bytes
+    char dhA_bytes[DH_KEY_SIZE];
+    mpz_export(dhA_bytes, NULL, 1, 1, 1, 0, dhA_mpz);
+    // sign the data
+    const char *private_key_file = "./keys/private.pem"; // should be the same for both client and server
+    
+    // make data n0 + n1 + dhA + dhB
+    char data[DH_NONCE_SIZE*2 + DH_KEY_SIZE*2];
+    memcpy(data, n0, DH_NONCE_SIZE);
+    memcpy(data + DH_NONCE_SIZE, n1, DH_NONCE_SIZE);
+    memcpy(data + DH_NONCE_SIZE*2, dhA_bytes, DH_KEY_SIZE);
+    memcpy(data + DH_NONCE_SIZE*2 + DH_KEY_SIZE, dhB_bytes, DH_KEY_SIZE);
+    
+    long data_len = DH_NONCE_SIZE*2 + DH_KEY_SIZE*2;
+
+    print_bytes(data, data_len);
+
+    char * signature;
+    size_t signed_len;
+    sign_data(private_key_file, data, data_len,&signature,&signed_len,"server");
+
     // send dhB, nonce to client
-    // payload = dhB (bytes) + nonce (bytes)
-    char server_payload[DH_KEY_SIZE + DH_NONCE_SIZE];
+    // payload = dhB (bytes) + nonce (bytes) + signature (bytes)
+    // char server_payload[DH_KEY_SIZE + DH_NONCE_SIZE];
+    long payload_len = DH_KEY_SIZE + DH_NONCE_SIZE + signed_len;
+    char * server_payload = malloc(payload_len);
+    
     memcpy(server_payload, dhB_bytes, DH_KEY_SIZE);
     memcpy(server_payload + DH_KEY_SIZE, n1, DH_NONCE_SIZE);
+    memcpy(server_payload + DH_KEY_SIZE + DH_NONCE_SIZE, signature, signed_len);
 
-    // printf("[SERVER] Sending payload to client of size %ld\n", sizeof(server_payload));
-    send(socket, server_payload, sizeof(server_payload), 0);
+    printf("[SERVER] Sending payload to client of size %ld\n", payload_len);
+    send(socket, server_payload, DH_KEY_SIZE + DH_NONCE_SIZE + signed_len , 0);
+    
     mpz_clears(dhB_mpz,b,master_key,NULL);
-
+    free(server_payload);
     return master_key_bytes;
 }
 

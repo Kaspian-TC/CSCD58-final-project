@@ -15,12 +15,16 @@ void free_Mdctx_private(EVP_MD_CTX *mdctx, EVP_PKEY *private_key){
     EVP_PKEY_free(private_key);
 }
 
-int sign_test_data(const char *private_key_file /* string */,const  char *data, long data_len, char ** signature, size_t * signed_len) {
+int sign_data(const char *private_key_path /* string */,const  char *data, long data_len, char ** signature, size_t * signed_len, char * password) {
 
     // Load the private key FROM A FILE
-    FILE *key_file = fopen(private_key_file, "r");
-    EVP_PKEY *private_key = PEM_read_PrivateKey(key_file, NULL, NULL, NULL);
+    FILE *key_file = fopen(private_key_path, "r");
+    EVP_PKEY *private_key = PEM_read_PrivateKey(key_file, NULL, NULL, password);
     fclose(key_file);
+    if(!private_key){
+        perror("Unable to read private key");
+        handle_openssl_error();
+    }
 
     // Create a context for signing
     EVP_MD_CTX *digest_context = EVP_MD_CTX_new();
@@ -37,16 +41,7 @@ int sign_test_data(const char *private_key_file /* string */,const  char *data, 
     // Assigns value to signature
     *signature = malloc(*signed_len);
     EVP_DigestSignFinal(digest_context, (unsigned char*) *signature, signed_len);
-    printf("Signature: ");
-    for (int i = 0; i < *signed_len; i++)
-    {
-        printf("%02x", (*signature)[i]);
-    }
-    printf("\n");
     printf("Signature created successfully\n");
-    // write signature to file called signature
-    FILE *signature_file = fopen("signature", "w");
-    fwrite(*signature, 1, *signed_len, signature_file);
     
     // Clean up
     EVP_MD_CTX_free(digest_context);
@@ -60,7 +55,7 @@ int sign_test_data(const char *private_key_file /* string */,const  char *data, 
     printf("\n");
     return EXIT_SUCCESS;
 }
-int check_signed_data(const char *public_key_file, const char *data, long data_len, char * signature, size_t sig_len){    
+int validate_signed_data(const char *public_key_file, const char *data, long data_len, char * signature, size_t sig_len){    
     int returnval;
 
     // Load public key
@@ -96,4 +91,34 @@ int check_signed_data(const char *public_key_file, const char *data, long data_l
     EVP_MD_CTX_free(digest_context);
     EVP_PKEY_free(public_key);
     return returnval;
+}
+
+void get_public_key(const char *private_key_path, char **public_key, size_t *public_key_len){
+    char * password = "client";
+    // Load the private key FROM A FILE
+    FILE *key_file = fopen(private_key_path, "r");
+    // load private key 
+    EVP_PKEY *private_key = PEM_read_PrivateKey(key_file, NULL, NULL, password);
+    fclose(key_file);
+    if(!private_key){
+        perror("Unable to read private key");
+        handle_openssl_error();
+    }
+    // basic input output type for open ssl, set to save to memory
+    BIO *bio = BIO_new(BIO_s_mem());
+    PEM_write_bio_PUBKEY(bio, private_key);
+
+    // get A POINTER TO the public key in bio (does not allocate)
+    char *pem_data = NULL;
+    long pem_len = BIO_get_mem_data(bio, &pem_data);
+
+    *public_key = malloc(pem_len);
+    *public_key_len = pem_len;
+
+    memcpy(*public_key, pem_data, pem_len);
+
+    BIO_free(bio);
+    EVP_PKEY_free(private_key);
+
+    return;
 }

@@ -49,6 +49,11 @@ int main()
         perror("simplex-talk: socket");
         exit(1);
     }
+
+    // Allow the socket to be reused immediately after the server terminates
+    int option = 1;
+    setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
+
     if ((bind(s, (struct sockaddr *)&sin, sizeof(sin))) < 0)
     {
         perror("simplex-talk: bind");
