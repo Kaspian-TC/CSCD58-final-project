@@ -47,12 +47,12 @@ int sign_data(const char *private_key_path /* string */,const  char *data, long 
     EVP_MD_CTX_free(digest_context);
     EVP_PKEY_free(private_key);
 
-    printf("Signature: ");
+    /* printf("Signature: ");
     for (int i = 0; i < *signed_len; i++)
     {
         printf("%02x", (*signature)[i]);
     }
-    printf("\n");
+    printf("\n"); */
     return EXIT_SUCCESS;
 }
 int validate_signed_data(const char *public_key_file, const char *data, long data_len, char * signature, size_t sig_len){    
@@ -79,22 +79,15 @@ int validate_signed_data(const char *public_key_file, const char *data, long dat
     EVP_DigestVerifyUpdate(digest_context, data, data_len);
     
     // Verify the signature
-    if (EVP_DigestVerifyFinal(digest_context, (unsigned char *)signature, sig_len) == 1) {
-        returnval = 1;
-        printf("Signature is valid.\n");
-    } else {
-        returnval = 0;
-        printf("Signature is invalid.\n");
-    }
-
+    returnval = EVP_DigestVerifyFinal(digest_context, (unsigned char *)signature, sig_len);
+    
     // Cleanup
     EVP_MD_CTX_free(digest_context);
     EVP_PKEY_free(public_key);
     return returnval;
 }
 
-void get_public_key(const char *private_key_path, char **public_key, size_t *public_key_len){
-    char * password = "client";
+void get_public_key(const char *private_key_path, char **public_key, size_t *public_key_len,char * password){
     // Load the private key FROM A FILE
     FILE *key_file = fopen(private_key_path, "r");
     // load private key 
@@ -111,10 +104,8 @@ void get_public_key(const char *private_key_path, char **public_key, size_t *pub
     // get A POINTER TO the public key in bio (does not allocate)
     char *pem_data = NULL;
     long pem_len = BIO_get_mem_data(bio, &pem_data);
-
-    *public_key = malloc(pem_len);
+    *public_key = (char *) malloc(pem_len);
     *public_key_len = pem_len;
-
     memcpy(*public_key, pem_data, pem_len);
 
     BIO_free(bio);
