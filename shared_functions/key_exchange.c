@@ -5,7 +5,7 @@
 #include <sys/socket.h>
 #include "helper_func.h"
 #include "certificates.h"
-
+#include <openssl/evp.h>
 
 
 // TLS IMPLEMENTATION - Client side
@@ -277,6 +277,114 @@ static void sign_data_to_client(
     sign_data(private_key_file, data, data_len,signature,signature_len,"server");
 }
 
+// AES Encryption
+int aes_encrypt(unsigned char *plaintext, int plaintext_len,
+ unsigned char *aad, int aad_len,
+ unsigned char *key,
+ unsigned char *iv, int iv_len,
+ unsigned char *ciphertext,
+ unsigned char *tag){
+    EVP_CIPHER_CTX *ctx;
+    int len;
+    int ciphertext_len;
+
+    // Create and initialize the context
+    if(!(ctx = EVP_CIPHER_CTX_new())) 
+        perror("Error creating context");
+    
+    // Initialize the encryption operation
+    if(1 != EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL))
+        perror("Error creating context");
+    
+    // Set IV length
+    if(1 != EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, iv_len, NULL))
+        perror("Error creating context");
+
+    // Initialize key and IV
+    if(1 != EVP_EncryptInit_ex(ctx, NULL, NULL, key, iv))
+        perror("Error creating context");
+
+    // Provide any AAD data
+    if(1 != EVP_EncryptUpdate(ctx, NULL, &len, aad, aad_len))
+        perror("Error creating context");
+    
+    // Provide the message to be encrypted, and obtain the encrypted output
+    if(1 != EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plaintext_len))
+        perror("Error creating context");
+    ciphertext_len = len;
+
+    // Finalize the encryption
+    if(1 != EVP_EncryptFinal_ex(ctx, ciphertext + len, &len))
+        perror("Error creating context");
+    ciphertext_len += len;
+
+    // Get the tag
+    if(1 != EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, 16, tag))
+        perror("Error creating context");
+
+    // Clean up
+    EVP_CIPHER_CTX_free(ctx);
+
+    return ciphertext_len;
+}
+
+// AES Decryption
+int gcm_decrypt(unsigned char *ciphertext, int ciphertext_len,
+ unsigned char *aad, int aad_len,
+ unsigned char *tag,
+ unsigned char *key,
+ unsigned char *iv, int iv_len,
+ unsigned char *plaintext){
+    EVP_CIPHER_CTX *ctx;
+    int len;
+    int plaintext_len;
+    int ret;
+
+    // Create and initialize the context
+    if(!(ctx = EVP_CIPHER_CTX_new())) 
+        perror("Error creating context");
+    
+    // Initialize the decryption operation
+    if(!EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL))
+        perror("Error creating context");
+    
+    // Set IV length
+    if(!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, iv_len, NULL))
+        perror("Error creating context");
+
+    // Initialize key and IV
+    if(!EVP_DecryptInit_ex(ctx, NULL, NULL, key, iv))
+        perror("Error creating context");
+
+    // Provide any AAD data
+    if(!EVP_DecryptUpdate(ctx, NULL, &len, aad, aad_len))
+        perror("Error creating context");
+    
+    // Provide the message to be decrypted, and obtain the plaintext output
+    if(!EVP_DecryptUpdate(ctx, plaintext, &len, ciphertext, ciphertext_len))
+        perror("Error creating context");
+    plaintext_len = len;
+
+    // Set expected tag value
+    if(!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, 16, tag))
+        perror("Error creating context");
+
+    // Finalize the decryption
+    ret = EVP_DecryptFinal_ex(ctx, plaintext + len, &len);
+
+    // Clean up
+    EVP_CIPHER_CTX_free(ctx);
+
+    if(ret > 0){
+        /* Success */
+        plaintext_len += len;
+        return plaintext_len;
+    } else {
+        /* Verify failed */
+        return -1;
+    }
+}
+
 char * send_server_hello(int socket,
  mpz_t prime, 
  mpz_t dhA_mpz, 
@@ -339,6 +447,33 @@ char * send_server_hello(int socket,
         public_key,
         public_key_len, 
         private_key_file);
+
+    // Concatenate signature and certificate
+    size_t plaintext_len = signed_len + public_key_len;
+    char * plaintext = malloc(plaintext_len);
+    memcpy(plaintext, signature, signed_len);
+    memcpy(plaintext + signed_len, public_key, public_key_len);
+
+
+    unsigned char iv[12];
+    unsigned char tag[16];
+    unsigned char *ciphertext = malloc(plaintext_len);
+
+    get_random_bytes(iv, 12, state);
+
+    int ciphertext_len = aes_encrypt(
+        (unsigned char *)plaintext,
+        plaintext_len,
+        NULL,
+        0,
+        (unsigned char *)session_key,
+        iv,
+        12,
+        ciphertext,
+        tag);
+
+    printf("[SERVER] Ciphertext");
+    print_bytes(ciphertext, ciphertext_len);
 
     long payload_len = DH_KEY_SIZE + DH_NONCE_SIZE + signed_len + public_key_len;
     char * server_payload = malloc(payload_len);
