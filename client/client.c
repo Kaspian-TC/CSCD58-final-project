@@ -71,22 +71,13 @@ int main(int argc, char *argv[])
     // when done with state
     gmp_randinit_mt(state);
     gmp_randseed_ui(state, time(NULL));
-    char master_key[256];
-    client_get_master_key(s, master_key, state);
+    
+    char session_key[AES_KEY_SIZE];
+    client_get_session_key(s, session_key, state);   
 
-    
-    /* const char *private_key_file = "./keys/private.pem";
-    const char *data = "This is the data to be signed";
-    long data_len = strlen(data);
-    char * signature;
-    size_t signed_len;
-    sign_data(private_key_file, data, data_len,&signature,&signed_len,"client");
-    // print the signature
-    printf("Signed length: %ld\n", signed_len);
-    const char *public_key_file = "./keys/public.pem";
-    validate_signed_data(public_key_file, data, data_len, signature, signed_len); */
-    
-    
+    printf("[CLIENT] Session key: ");   
+    print_bytes(session_key, AES_KEY_SIZE);
+
     // close the connection
     close(s);
     gmp_randclear(state); 

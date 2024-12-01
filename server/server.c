@@ -3,7 +3,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
-#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -18,12 +17,6 @@
 #define MAX_LINE 256
 
 
-#define BUFFER_SIZE 1048576 // 1 MB
-#define DH_NUM_BITS 2048
-#define DH_G 5
-#define DH_KEY_SIZE 256
-#define DH_NONCE_SIZE 16
-#define AES_KEY_SIZE 32
 
 
 
@@ -79,12 +72,15 @@ int main()
         printf("[SERVER] Connection established.\n");
 
         // the client is sending the payload for Diffie-Hellman key exchange
-        char master_key[256];
+        char session_key[AES_KEY_SIZE]; 
         
-        server_get_master_key(new_s, master_key, state);
+        server_get_session_key(new_s, session_key, state);
+        
+        printf("[SERVER] Session key: ");   
+        print_bytes(session_key, AES_KEY_SIZE);
+
         // close the connection
         close(new_s);
-
         printf("[SERVER] Connection closed.\n");
     }
     gmp_randclear(state);

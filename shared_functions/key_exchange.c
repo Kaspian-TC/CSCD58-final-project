@@ -5,7 +5,6 @@
 #include <sys/socket.h>
 #include "helper_func.h"
 #include "certificates.h"
-#include <openssl/evp.h>
 
 
 // TLS IMPLEMENTATION - Client side
@@ -13,15 +12,6 @@
 // Client creates p using fixed g such that g is coprime to p-1
 // client creates a secret number a and computes dhA = g^a mod p
 // client creates a nonce and sends p, dhA, nonce to server
-
-#define BUFFER_SIZE 1048576 // 1 MB
-#define DH_NUM_BITS 2048
-#define DH_G 5
-#define DH_KEY_SIZE 256
-#define DH_NONCE_SIZE 16
-#define AES_KEY_SIZE 32
-#define AES_IV_SIZE 12
-#define AES_TAG_SIZE 16
 
 void get_big_prime(mpz_t prime, gmp_randstate_t state)
 {
@@ -33,114 +23,6 @@ void get_big_prime(mpz_t prime, gmp_randstate_t state)
     
     mpz_clear(random_number);
     
-}
-
-// AES Encryption
-int aes_encrypt(unsigned char *plaintext, int plaintext_len,
- unsigned char *aad, int aad_len,
- unsigned char *key,
- unsigned char *iv, int iv_len,
- unsigned char *ciphertext,
- unsigned char *tag){
-    EVP_CIPHER_CTX *ctx;
-    int len;
-    int ciphertext_len;
-
-    // Create and initialize the context
-    if(!(ctx = EVP_CIPHER_CTX_new())) 
-        perror("Encryption error");
-    
-    // Initialize the encryption operation
-    if(1 != EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL))
-        perror("Encryption error");
-    
-    // Set IV length
-    if(1 != EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, iv_len, NULL))
-        perror("Encryption error");
-
-    // Initialize key and IV
-    if(1 != EVP_EncryptInit_ex(ctx, NULL, NULL, key, iv))
-        perror("Encryption error");
-
-    // Provide any AAD data
-    if(1 != EVP_EncryptUpdate(ctx, NULL, &len, aad, aad_len))
-        perror("Encryption error");
-    
-    // Provide the message to be encrypted, and obtain the encrypted output
-    if(1 != EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plaintext_len))
-        perror("Encryption error");
-    ciphertext_len = len;
-
-    // Finalize the encryption
-    if(1 != EVP_EncryptFinal_ex(ctx, ciphertext + len, &len))
-        perror("Encryption error");
-    ciphertext_len += len;
-
-    // Get the tag
-    if(1 != EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, 16, tag))
-        perror("Encryption error");
-
-    // Clean up
-    EVP_CIPHER_CTX_free(ctx);
-
-    return ciphertext_len;
-}
-
-// AES Decryption
-int aes_decrypt(unsigned char *ciphertext, int ciphertext_len,
- unsigned char *aad, int aad_len,
- unsigned char *tag,
- unsigned char *key,
- unsigned char *iv, int iv_len,
- unsigned char *plaintext){
-    EVP_CIPHER_CTX *ctx;
-    int len;
-    int plaintext_len;
-    int ret;
-
-    // Create and initialize the context
-    if(!(ctx = EVP_CIPHER_CTX_new())) 
-        perror("Decryption error");
-    
-    // Initialize the decryption operation
-    if(!EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL))
-        perror("Decryption error");
-    
-    // Set IV length
-    if(!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, iv_len, NULL))
-        perror("Decryption error");
-
-    // Initialize key and IV
-    if(!EVP_DecryptInit_ex(ctx, NULL, NULL, key, iv))
-        perror("Decryption error");
-
-    // Provide any AAD data
-    if(!EVP_DecryptUpdate(ctx, NULL, &len, aad, aad_len))
-        perror("Decryption error");
-    
-    // Provide the message to be decrypted, and obtain the plaintext output
-    if(!EVP_DecryptUpdate(ctx, plaintext, &len, ciphertext, ciphertext_len))
-        perror("Decryption error");
-    plaintext_len = len;
-
-    // Set expected tag value
-    if(!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, 16, tag))
-        perror("Decryption error");
-
-    // Finalize the decryption
-    ret = EVP_DecryptFinal_ex(ctx, plaintext + len, &len);
-
-    // Clean up
-    EVP_CIPHER_CTX_free(ctx);
-
-    if(ret > 0){
-        /* Success */
-        plaintext_len += len;
-        return plaintext_len;
-    } else {
-        /* Verify failed */
-        return -1;
-    }
 }
 
 // send_client_hello function contains all information passed to command line
@@ -216,7 +98,7 @@ static int is_server_response_sign_valid(
     char* n0,char* n1,char* dhA_bytes,char* dhB_bytes,char* signature, long signature_len, char * public_key_file, size_t public_key_len){
 
     // get the server's public key
-    const char *server_public_key_file = "./keys/private.pem"; // here it should call the "CA"
+    const char *server_public_key_file = "./keys/server.pem"; // here it should call the "CA"
 
     // load in the server public key from file
     char *server_public_key;
@@ -252,23 +134,22 @@ mpz_t a,
 gmp_randstate_t state, 
 char * master_key_bytes,
 char * n0, 
-char * n1){
+char * n1,
+char * session_key /* Assume 32 bytes */){
     // wait to receive a response from the server
-    char client_payload[DH_KEY_SIZE + DH_NONCE_SIZE + AES_IV_SIZE + AES_TAG_SIZE + 1024]; // 1024 is for padding
+    char client_payload[DH_KEY_SIZE + DH_NONCE_SIZE + AES_TAG_SIZE + 1024]; // 1024 is for padding
     int payload_len = recv(socket, client_payload, 
      sizeof(client_payload), 0);
     printf("[CLIENT] Received payload from server of size %d\n", payload_len);
     char dhB_bytes[DH_KEY_SIZE];
-    char iv[AES_IV_SIZE];
     char tag[AES_TAG_SIZE];
-    long ciphertext_len = payload_len - DH_KEY_SIZE - DH_NONCE_SIZE - AES_IV_SIZE - AES_TAG_SIZE;
+    long ciphertext_len = payload_len - DH_KEY_SIZE - DH_NONCE_SIZE - AES_TAG_SIZE;
     char ciphertext[ciphertext_len];
 
     memcpy(dhB_bytes, client_payload, DH_KEY_SIZE);
     memcpy(n1, client_payload + DH_KEY_SIZE, DH_NONCE_SIZE);
-    memcpy(iv, client_payload + DH_KEY_SIZE + DH_NONCE_SIZE, AES_IV_SIZE);
-    memcpy(tag, client_payload + DH_KEY_SIZE + DH_NONCE_SIZE + AES_IV_SIZE, AES_TAG_SIZE);
-    memcpy(ciphertext, client_payload + DH_KEY_SIZE + DH_NONCE_SIZE + AES_IV_SIZE + AES_TAG_SIZE, ciphertext_len);
+    memcpy(tag, client_payload + DH_KEY_SIZE + DH_NONCE_SIZE, AES_TAG_SIZE);
+    memcpy(ciphertext, client_payload + DH_KEY_SIZE + DH_NONCE_SIZE + AES_TAG_SIZE, ciphertext_len);
 
     //compute session key
     mpz_t dhB_mpz;
@@ -287,7 +168,7 @@ char * n1){
 
     char salt[DH_NONCE_SIZE*2];
     create_salt(salt,n0,n1);
-    char session_key[AES_KEY_SIZE]; 
+    
     create_session_key(master_key_bytes, salt,session_key);
     printf("[CLIENT] Session key: ");
     print_bytes(session_key, AES_KEY_SIZE);
@@ -300,10 +181,10 @@ char * n1){
         NULL, 0,
         (unsigned char *) tag,
         (unsigned char *) session_key,
-        (unsigned char *) iv,
-        AES_IV_SIZE,
+        (unsigned char *) n1,
+        DH_NONCE_SIZE,
         plaintext);
-
+    plaintext_len = ciphertext_len;
     long signature_len = 256;
     char signature[signature_len];
     long server_public_key_len = plaintext_len - signature_len;
@@ -326,24 +207,25 @@ char * n1){
     // Clean up
     free(plaintext);
 
-	return master_key_bytes;
+	return session_key;
 }
 
-char * client_get_master_key(int socket, char * master_key /* assumed 256 length */,
+char * client_get_session_key(int socket, char * session_key /* assumed 256 length */,
  gmp_randstate_t state){
 	mpz_t prime, dhA_mpz, a;
     mpz_init2(prime,DH_NUM_BITS);//make sure to call mpz_clear(); after using
-    
+    char master_key[DH_KEY_SIZE];
     char n0[DH_NONCE_SIZE];
     char n1[DH_NONCE_SIZE];
     get_big_prime(prime,state);
 
     initialize_values(prime, dhA_mpz, a, state);
     send_client_hello(socket,prime, dhA_mpz, a,state,n0);
-    receive_server_hello(socket, prime, dhA_mpz, a,state, master_key,n0,n1);
+    receive_server_hello(socket,
+     prime, dhA_mpz, a,state, master_key,n0,n1,session_key);
 	mpz_clears(prime,dhA_mpz,a,NULL);
 
-	return master_key;
+	return session_key;
 }
 
 // TLS IMPLEMENTATION - Server side
@@ -417,7 +299,7 @@ char * send_server_hello(int socket,
  mpz_t prime, 
  mpz_t dhA_mpz, 
  gmp_randstate_t state, char * master_key_bytes /* assume 256 bytes */,
- char * n0, char * n1){
+ char * n0, char * n1, char * session_key /* assume 32 */){
     mpz_t b, g, dhB_mpz;
     initialize_values(prime,dhB_mpz,b,state);
     
@@ -439,12 +321,15 @@ char * send_server_hello(int socket,
     // get the session key for aes
     char salt[DH_NONCE_SIZE*2];
     create_salt(salt,n0,n1);
-    char session_key[AES_KEY_SIZE]; 
-    create_session_key(master_key_bytes, salt,session_key);
+    
+    create_session_key(
+        (unsigned char *) master_key_bytes, 
+        (unsigned char *)salt,
+        (unsigned char *)session_key);
     
     printf("[SERVER] Session key: ");
     print_bytes(session_key, AES_KEY_SIZE);
-    printf("size of session key: %ld\n", sizeof(session_key));
+    printf("size of session key: %d\n", AES_KEY_SIZE);
 
     // convert dhA to string of bytes
     char dhA_bytes[DH_KEY_SIZE];
@@ -487,11 +372,8 @@ char * send_server_hello(int socket,
     printf("[SERVER] public key: ");
     print_bytes(public_key, public_key_len);
 
-    unsigned char iv[AES_IV_SIZE];
     unsigned char tag[AES_TAG_SIZE];
     unsigned char *ciphertext = malloc(plaintext_len);
-
-    get_random_bytes(iv, AES_IV_SIZE, state);
 
     int ciphertext_len = aes_encrypt(
         (unsigned char *)plaintext,
@@ -499,24 +381,22 @@ char * send_server_hello(int socket,
         NULL,
         0,
         (unsigned char *)session_key,
-        iv,
-        AES_IV_SIZE,
+        (unsigned char *)n1,
+        DH_NONCE_SIZE,
         ciphertext,
         tag);
 
-    printf("[SERVER] Ciphertext");
-    print_bytes(ciphertext, ciphertext_len);
-    printf("size of iv: %ld\n", sizeof(iv));
+    /* printf("[SERVER] Ciphertext");
+    print_bytes((char *)ciphertext, ciphertext_len); */
     printf("size of tag: %ld\n", sizeof(tag));
 
-    size_t payload_len = DH_KEY_SIZE + DH_NONCE_SIZE + AES_IV_SIZE + AES_TAG_SIZE + ciphertext_len;
+    size_t payload_len = DH_KEY_SIZE + DH_NONCE_SIZE + AES_TAG_SIZE + ciphertext_len;
     char * server_payload = malloc(payload_len);
 
     memcpy(server_payload, dhB_bytes, DH_KEY_SIZE);
     memcpy(server_payload + DH_KEY_SIZE, n1, DH_NONCE_SIZE);
-    memcpy(server_payload + DH_KEY_SIZE + DH_NONCE_SIZE, iv, AES_IV_SIZE);
-    memcpy(server_payload + DH_KEY_SIZE + DH_NONCE_SIZE + AES_IV_SIZE, tag, AES_TAG_SIZE);
-    memcpy(server_payload + DH_KEY_SIZE + DH_NONCE_SIZE + AES_IV_SIZE + AES_TAG_SIZE, ciphertext, ciphertext_len);
+    memcpy(server_payload + DH_KEY_SIZE + DH_NONCE_SIZE , tag, AES_TAG_SIZE);
+    memcpy(server_payload + DH_KEY_SIZE + DH_NONCE_SIZE + AES_TAG_SIZE, ciphertext, ciphertext_len);
 
     printf("[SERVER] Sending payload to client of size %ld\n", payload_len);
     send(socket, server_payload, payload_len , 0);
@@ -530,15 +410,17 @@ char * send_server_hello(int socket,
     return master_key_bytes;
 }
 
-char * server_get_master_key(int socket, char * master_key /* assumed 256 length */,
+char * server_get_session_key(int socket,  char * session_key  /* assumed 32 length */,
  gmp_randstate_t state){
+    char master_key[DH_KEY_SIZE];
     char n0[DH_NONCE_SIZE];
     char n1[DH_NONCE_SIZE];
     mpz_t prime;
     mpz_t dhA_mpz;
     receive_client_hello(socket, prime, dhA_mpz, state, n0,n1);
-    send_server_hello(socket,prime,dhA_mpz,state,master_key,n0,n1);
+    send_server_hello(socket,prime,dhA_mpz,state,master_key,n0,n1,session_key);
     mpz_clears(prime,dhA_mpz,NULL);
-    return master_key;
+
+    return session_key;
 }
 
