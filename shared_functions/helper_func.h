@@ -29,3 +29,5 @@ int aes_decrypt(unsigned char *ciphertext, int ciphertext_len,
     unsigned char *key,
     unsigned char *iv, int iv_len,
     unsigned char *plaintext);
+int send_encypted_data(int socket, char *data, int data_len, char *session_key, gmp_randstate_t state);
+char * receive_encypted_data(int socket, int * data_len, char *session_key);

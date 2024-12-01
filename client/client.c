@@ -73,10 +73,25 @@ int main(int argc, char *argv[])
     gmp_randseed_ui(state, time(NULL));
     
     char session_key[AES_KEY_SIZE];
-    client_get_session_key(s, session_key, state);   
-
+    client_get_session_key(s, session_key, state);
     printf("[CLIENT] Session key: ");   
     print_bytes(session_key, AES_KEY_SIZE);
+
+    char * string = "Hello, World!";
+    // send the encrypted data
+    send_encypted_data(s, string, strlen(string), session_key, state);
+    // receive the data
+    int data_len;
+    // receive encrypted data for the client
+    char * data = receive_encypted_data(s, &data_len,
+        session_key);
+
+    // print out the plaintext
+    printf("Plaintext: ");
+    for(int i = 0; i < data_len; i++){
+        printf("%c", data[i]);
+    }
+    printf("\n");
 
     // close the connection
     close(s);

@@ -79,6 +79,26 @@ int main()
         printf("[SERVER] Session key: ");   
         print_bytes(session_key, AES_KEY_SIZE);
 
+        int data_len;
+        // receive encrypted data for the client
+        char * data = receive_encypted_data(new_s, &data_len,
+         session_key);
+
+        // print out the plaintext
+        printf("Plaintext: ");
+        for(int i = 0; i < data_len; i++){
+            printf("%c", data[i]);
+        }
+        printf("\n");
+        // send back plaintext + current time to client
+        const char * format = "Current time: %d-%d-%d %d:%d:%d\n";
+        char * response = malloc(data_len + strlen(format));
+        memcpy(response, data, data_len);
+        time_t t = time(NULL);
+        struct tm tm = *localtime(&t);
+        sprintf(response + data_len, format , tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+        send_encypted_data(new_s, response, data_len + strlen(format), session_key, state);
+
         // close the connection
         close(new_s);
         printf("[SERVER] Connection closed.\n");

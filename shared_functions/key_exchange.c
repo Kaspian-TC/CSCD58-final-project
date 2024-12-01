@@ -185,7 +185,7 @@ char * session_key /* Assume 32 bytes */){
         DH_NONCE_SIZE,
         plaintext);
     plaintext_len = ciphertext_len;
-    long signature_len = 256;
+    long signature_len = 256; // signature length is always 256
     char signature[signature_len];
     long server_public_key_len = plaintext_len - signature_len;
     char server_public_key[server_public_key_len];   

@@ -5,6 +5,7 @@
 #include <openssl/kdf.h>
 #include <openssl/params.h>
 #include <openssl/err.h>
+#include <sys/socket.h>
 #include "helper_func.h"
 
 void get_random_bytes(char *bytes, int length,gmp_randstate_t state)
@@ -96,9 +97,6 @@ void print_bytes(char *bytes, int length)
 	printf("\n");
 }
 
-int send_encrypted_data(int socket, char *data, int data_len, char *session_key, char *iv, char *tag){
-    
-}
 
 
 // AES Decryption
@@ -204,4 +202,66 @@ int aes_encrypt(unsigned char *plaintext, int plaintext_len,
     EVP_CIPHER_CTX_free(ctx);
 
     return ciphertext_len;
+}
+
+int send_encypted_data(int socket, char *data, int data_len, char *session_key, gmp_randstate_t state){
+    unsigned char tag[AES_TAG_SIZE];
+    char nonce[DH_NONCE_SIZE];
+    // generate a nonce
+    get_random_bytes(nonce, DH_NONCE_SIZE, state);
+    // Encrypt the data
+    unsigned char *ciphertext = malloc(data_len);
+    int ciphertext_len = aes_encrypt(
+        (unsigned char *)data,
+        data_len,
+        NULL,
+        0,
+        (unsigned char *)session_key,
+        (unsigned char *)nonce,
+        DH_NONCE_SIZE,
+        ciphertext,
+        (unsigned char *)tag);
+    // construct the payload (nonce + tag + ciphertext)
+    int payload_len = DH_NONCE_SIZE + AES_TAG_SIZE + ciphertext_len;
+    char payload[payload_len];
+    memcpy(payload, nonce, DH_NONCE_SIZE);
+    memcpy(payload + DH_NONCE_SIZE, tag, AES_TAG_SIZE);
+    memcpy(payload + DH_NONCE_SIZE + AES_TAG_SIZE, ciphertext, ciphertext_len);
+
+    free(ciphertext);
+    // send the payload
+    send(socket, payload, payload_len, 0);
+
+    return payload_len;
+
+}
+char * receive_encypted_data(int socket, int * data_len, char *session_key){
+    char payload[DH_NONCE_SIZE + AES_TAG_SIZE + 1024];
+    int payload_len = recv(socket, payload, DH_NONCE_SIZE + AES_TAG_SIZE + 1024, 0);
+    printf("Received payload of size %d\n", payload_len);
+    char nonce[DH_NONCE_SIZE];
+    char tag[AES_TAG_SIZE];
+    long ciphertext_len = payload_len - DH_NONCE_SIZE - AES_TAG_SIZE;
+    char ciphertext[ciphertext_len];
+
+    // add the nonce, tag, and ciphertext to payload
+    memcpy(nonce, payload, DH_NONCE_SIZE);
+    memcpy(tag, payload + DH_NONCE_SIZE, AES_TAG_SIZE);
+    memcpy(ciphertext, payload + DH_NONCE_SIZE + AES_TAG_SIZE, ciphertext_len);
+
+    // decrypt the ciphertext
+    unsigned char *plaintext = malloc(ciphertext_len);
+    int plaintext_len = aes_decrypt(
+        (unsigned char *)ciphertext,
+        ciphertext_len,
+        NULL, 0,
+        (unsigned char *)tag,
+        (unsigned char *)session_key,
+        (unsigned char *)nonce,
+        DH_NONCE_SIZE,
+        plaintext);
+    
+    
+    *data_len = plaintext_len;
+    return (char *) plaintext;
 }
