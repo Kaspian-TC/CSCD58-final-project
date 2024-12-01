@@ -5,93 +5,87 @@
 #include <netinet/in.h>
 #include "server.h"
 
-// Function to store data locally in separate files for each block
+char global_data[MAX_LINE] = "";
+
 void store_data(const char* payload) {
-    static int block_id = 1; // Incremental block IDs
-    char filename[64];
-    snprintf(filename, sizeof(filename), "block%d.txt", block_id);
-
-    FILE* fp = fopen(filename, "w");
-    if (fp == NULL) {
-        perror("[STORAGE] Failed to create block file");
-        return;
-    }
-
-    fprintf(fp, "%s\n", payload);
-    fclose(fp);
-
-    printf("[STORAGE] Stored block in %s\n", filename);
-    block_id++;
+    strncpy(global_data, payload, MAX_LINE - 1);
+    global_data[MAX_LINE - 1] = '\0';
+    printf("[SERVER] Stored: %s\n", global_data);
 }
 
-// Function to retrieve all stored blocks
-void retrieve_data(int socket) {
-    char buf[MAX_LINE];
-    char final_payload[MAX_LINE * 100] = {0};
+void retrieve_data(int client_sock) {
+    if (strlen(global_data) > 0) {
+        send(client_sock, global_data, strlen(global_data), 0);
+        printf("[SERVER] Sent: %s\n", global_data);
+    } else {
+        const char* no_data = "NO_DATA";
+        send(client_sock, no_data, strlen(no_data), 0);
+        printf("[SERVER] No data to send.\n");
+    }
+}
 
-    for (int i = 1; i <= 100; i++) { // Assume a maximum of 100 blocks
-        char filename[64];
-        snprintf(filename, sizeof(filename), "block%d.txt", i);
+void handle_client(int client_sock) {
+    char buffer[MAX_LINE] = {0};
+    int len = recv(client_sock, buffer, sizeof(buffer) - 1, 0);
 
-        FILE* fp = fopen(filename, "r");
-        if (fp == NULL) break; // Stop if no more blocks
-
-        while (fgets(buf, sizeof(buf), fp)) {
-            strcat(final_payload, buf);
+    if (len > 0) {
+        buffer[len] = '\0';
+        if (strcmp(buffer, "RETRIEVE") == 0) {
+            retrieve_data(client_sock);
+        } else {
+            store_data(buffer);
+            const char* ack = "DATA_STORED";
+            send(client_sock, ack, strlen(ack), 0);
         }
-        fclose(fp);
     }
 
-    send(socket, final_payload, strlen(final_payload), 0);
-    printf("[STORAGE] Sent all stored blocks.\n");
+    close(client_sock);
 }
 
 int main() {
-    struct sockaddr_in sin;
-    char buf[MAX_LINE];
-    int len, s, new_s;
+    printf("[SERVER] Starting server process...\n");
+    // flush stdout to make sure the message is displayed
+    fflush(stdout);
 
-    // Build address data structure
-    bzero((char*)&sin, sizeof(sin));
-    sin.sin_family = AF_INET;
-    sin.sin_addr.s_addr = INADDR_ANY;
-    sin.sin_port = htons(SERVER_PORT);
+    int server_sock, client_sock;
+    struct sockaddr_in server_addr, client_addr;
+    socklen_t addr_len = sizeof(client_addr);
 
-    if ((s = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
-        perror("[STORAGE] Socket creation failed");
-        exit(1);
+    server_sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_sock < 0) {
+        perror("[SERVER] Socket creation failed");
+        exit(EXIT_FAILURE);
     }
 
-    if ((bind(s, (struct sockaddr*)&sin, sizeof(sin))) < 0) {
-        perror("[STORAGE] Binding failed");
-        close(s);
-        exit(1);
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(SERVER_PORT);
+
+    if (bind(server_sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+        perror("[SERVER] Bind failed");
+        close(server_sock);
+        exit(EXIT_FAILURE);
     }
 
-    listen(s, 5);
-    printf("[STORAGE] Listening on port %d...\n", SERVER_PORT);
+    if (listen(server_sock, 5) < 0) {
+        perror("[SERVER] Listen failed");
+        close(server_sock);
+        exit(EXIT_FAILURE);
+    }
+
+    printf("[SERVER] Listening on port %d\n", SERVER_PORT);
 
     while (1) {
-        if ((new_s = accept(s, (struct sockaddr*)&sin, &len)) < 0) {
-            perror("[STORAGE] Accept failed");
-            close(s);
-            exit(1);
+        client_sock = accept(server_sock, (struct sockaddr*)&client_addr, &addr_len);
+        if (client_sock < 0) {
+            perror("[SERVER] Accept failed");
+            continue;
         }
 
-        len = recv(new_s, buf, sizeof(buf) - 1, 0);
-        buf[len] = '\0';
-
-        if (strcmp(buf, "GET_DATA") == 0) {
-            printf("[STORAGE] Received data retrieval request\n");
-            retrieve_data(new_s);
-        } else {
-            printf("[STORAGE] Received data: %s\n", buf);
-            store_data(buf);
-        }
-
-        close(new_s);
+        handle_client(client_sock);
     }
 
-    close(s);
+    close(server_sock);
     return 0;
 }

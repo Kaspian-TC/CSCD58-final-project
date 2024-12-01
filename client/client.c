@@ -1,88 +1,76 @@
 #include <stdio.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <arpa/inet.h>
 #include <time.h>
 
-#include "client.h"
+#define MAX_LINE 256
+#define SERVER_PORT 5432
 
-void send_data(int socket, const char* data) {
-    send(socket, data, strlen(data), 0);
-    printf("[CLIENT] Sent: %s\n", data);
+void generate_random_data(char* buffer, size_t length) {
+    srand(time(NULL));
+    snprintf(buffer, length, "RandomData_%d", rand());
 }
 
-void retrieve_data(int socket) {
-    char buf[MAX_LINE];
-    int len;
+void store_data(int sockfd) {
+    char buffer[MAX_LINE] = {0};
+    generate_random_data(buffer, sizeof(buffer));
+    send(sockfd, buffer, strlen(buffer), 0);
+    printf("[CLIENT] Sent: %s\n", buffer);
 
-    send_data(socket, "RETRIEVE");
-    printf("[CLIENT] Sent retrieval request\n");
-
-    // Receive data from the server
-    printf("[CLIENT] Received data:\n");
-    while ((len = recv(socket, buf, MAX_LINE - 1, 0)) > 0) {
-        buf[len] = '\0';
-        printf("%s", buf);
-    }
-    printf("\n[CLIENT] Data retrieval complete\n");
+    char response[MAX_LINE] = {0};
+    recv(sockfd, response, sizeof(response), 0);
+    printf("[CLIENT] Received: %s\n", response);
 }
 
-int main(int argc, char* argv[]) {
-    struct hostent* hp;
-    struct sockaddr_in sin;
-    char* host;
-    int s;
+void retrieve_data(int sockfd) {
+    char buffer[MAX_LINE] = "RETRIEVE";
+    send(sockfd, buffer, strlen(buffer), 0);
+    printf("[CLIENT] Sent: %s\n", buffer);
 
-    if (argc != 3 || (strcmp(argv[1], "--store") != 0 && strcmp(argv[1], "--retrieve") != 0)) {
+    char response[MAX_LINE * 3] = {0};
+    recv(sockfd, response, sizeof(response), 0);
+    printf("[CLIENT] Received: %s\n", response);
+}
+
+int main(int argc, char** argv) {
+    if (argc != 3) {
         fprintf(stderr, "Usage: %s --store|--retrieve <router_host>\n", argv[0]);
-        exit(1);
+        return 1;
     }
 
-    char* mode = argv[1];
-    host = argv[2];
+    int sockfd;
+    struct sockaddr_in server_addr;
 
-    // Translate host name into peer's IP address
-    hp = gethostbyname(host);
-    if (!hp) {
-        fprintf(stderr, "simplex-talk: unknown host: %s\n", host);
-        exit(1);
+    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        perror("[CLIENT] Socket creation failed");
+        return 1;
     }
 
-    // Build address data structure
-    bzero((char*)&sin, sizeof(sin));
-    sin.sin_family = AF_INET;
-    bcopy(hp->h_addr, (char*)&sin.sin_addr, hp->h_length);
-    sin.sin_port = htons(SERVER_PORT);
-
-    // Active open
-    if ((s = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
-        perror("simplex-talk: socket");
-        exit(1);
-    }
-    if (connect(s, (struct sockaddr*)&sin, sizeof(sin)) < 0) {
-        perror("simplex-talk: connect");
-        close(s);
-        exit(1);
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(SERVER_PORT);
+    if (inet_pton(AF_INET, argv[2], &server_addr.sin_addr) <= 0) {
+        perror("[CLIENT] Invalid router IP address");
+        close(sockfd);
+        return 1;
     }
 
-    printf("[CLIENT] Connected to server at %s\n", host);
-
-    if (strcmp(mode, "--store") == 0) {
-        // Generate and send a random string
-        srand(time(NULL));
-        char random_string[MAX_LINE];
-        snprintf(random_string, sizeof(random_string), "RandomData_%d", rand());
-        send_data(s, random_string);
-    } else if (strcmp(mode, "--retrieve") == 0) {
-        // Retrieve data from the router
-        retrieve_data(s);
+    if (connect(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+        perror("[CLIENT] Connection failed");
+        close(sockfd);
+        return 1;
     }
 
-    close(s);
+    if (strcmp(argv[1], "--store") == 0) {
+        store_data(sockfd);
+    } else if (strcmp(argv[1], "--retrieve") == 0) {
+        retrieve_data(sockfd);
+    } else {
+        fprintf(stderr, "Invalid operation: %s\n", argv[1]);
+    }
+
+    close(sockfd);
     return 0;
 }

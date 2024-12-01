@@ -9,9 +9,9 @@ def custom_topology():
     # Add hosts
     client = net.addHost('h1', ip='10.0.0.1/24')  # Client in subnet 10.0.0.0/24
     router = net.addHost('h2')  # Router without default IP
-    server1 = net.addHost('h3', ip='10.0.1.1/24') # Server 1 in subnet 10.0.1.0/24
-    server2 = net.addHost('h4', ip='10.0.2.1/24') # Server 2 in subnet 10.0.2.0/24
-    server3 = net.addHost('h5', ip='10.0.3.1/24') # Server 3 in subnet 10.0.3.0/24
+    server1 = net.addHost('h3', ip='10.0.1.1/24')  # Server 1 in subnet 10.0.1.0/24
+    server2 = net.addHost('h4', ip='10.0.2.1/24')  # Server 2 in subnet 10.0.2.0/24
+    server3 = net.addHost('h5', ip='10.0.3.1/24')  # Server 3 in subnet 10.0.3.0/24
 
     # Add links
     net.addLink(client, router)
