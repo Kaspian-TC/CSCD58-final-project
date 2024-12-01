@@ -31,16 +31,16 @@ void send_client_hello(int socket,
  mpz_t prime, 
  mpz_t dhA_mpz, 
  mpz_t a,
- gmp_randstate_t state, char * n0){
+ gmp_randstate_t state, uint8_t * n0){
 
     // convert dhA to string of bytes
-    char dhA_bytes[DH_KEY_SIZE];
+    uint8_t dhA_bytes[DH_KEY_SIZE];
     /* array, count (# of words produced), size(bytes per), order(set 1), endian 
     (1 for big, -1 for little, 0 for native cpu), nails (The number of most 
      significant bits to skip), op (The integer to convert)
     */
     mpz_export(dhA_bytes, NULL, 1, 1, 1, 0, dhA_mpz);
-    char prime_bytes[DH_KEY_SIZE];
+    uint8_t prime_bytes[DH_KEY_SIZE];
     mpz_export(prime_bytes, NULL, 1, 1, 1, 0, prime);
     
     // nonce is a random byte string of length DH_NONCE_SIZE
@@ -48,7 +48,7 @@ void send_client_hello(int socket,
 
     // send p, dhA, nonce to server
     // payload = p (bytes) + dhA (bytes) + nonce (bytes)
-    char payload[DH_KEY_SIZE + DH_KEY_SIZE + DH_NONCE_SIZE];
+    uint8_t payload[DH_KEY_SIZE + DH_KEY_SIZE + DH_NONCE_SIZE];
     memcpy(payload, prime_bytes, sizeof(prime_bytes));
     memcpy(payload + DH_KEY_SIZE, dhA_bytes, DH_KEY_SIZE);
     memcpy(payload + DH_KEY_SIZE + DH_KEY_SIZE, n0,
@@ -70,7 +70,7 @@ void send_client_hello(int socket,
 
 static void get_public_key_file(
     const char *server_public_key_file, 
-    char **server_public_key, 
+    uint8_t **server_public_key, 
     size_t *server_public_key_len)
     {
 
@@ -85,7 +85,7 @@ static void get_public_key_file(
     rewind(server_key_file);
     
     // read into buffer
-    *server_public_key = (char *) malloc(file_size);
+    *server_public_key = (uint8_t *) malloc(file_size);
     *server_public_key_len = fread(*server_public_key, 1, file_size, server_key_file);
 
 
@@ -95,26 +95,26 @@ static void get_public_key_file(
 
 /* Helper function for receive_server_hello */
 static int is_server_response_sign_valid(
-    char* n0,char* n1,char* dhA_bytes,char* dhB_bytes,char* signature, long signature_len, char * public_key_file, size_t public_key_len){
+    uint8_t* n0,uint8_t* n1,uint8_t* dhA_bytes,uint8_t* dhB_bytes,uint8_t* signature, long signature_len, uint8_t * public_key_file, size_t public_key_len){
 
     // get the server's public key
     const char *server_public_key_file = "./keys/server.pem"; // here it should call the "CA"
 
     // load in the server public key from file
-    char *server_public_key;
+    uint8_t *server_public_key;
     size_t server_public_key_len;
     /* server_public_key is malloced */
     get_public_key_file(
         server_public_key_file, &server_public_key,
          &server_public_key_len);
     // compare read in public key with the public key from the server
-    if (strncmp(server_public_key, public_key_file, public_key_len) != 0){
+    if (strncmp((char *)server_public_key, (char *)public_key_file, public_key_len) != 0){
         free(server_public_key);
         return 0;
     }
     // make data n0 + n1 + dhA + dhB + certificate
     long data_len = DH_NONCE_SIZE*2 + DH_KEY_SIZE*2 + server_public_key_len;
-    char data[data_len];
+    uint8_t data[data_len];
     memcpy(data, n0, DH_NONCE_SIZE);
     memcpy(data + DH_NONCE_SIZE, n1, DH_NONCE_SIZE);
     memcpy(data + DH_NONCE_SIZE*2, dhA_bytes, DH_KEY_SIZE);
@@ -127,24 +127,24 @@ static int is_server_response_sign_valid(
     return valid;
 }
 
-char * receive_server_hello(int socket, 
+uint8_t * receive_server_hello(int socket, 
 mpz_t prime, 
 mpz_t dhA_mpz, 
 mpz_t a,
 gmp_randstate_t state, 
-char * master_key_bytes,
-char * n0, 
-char * n1,
-char * session_key /* Assume 32 bytes */){
+uint8_t * master_key_bytes,
+uint8_t * n0, 
+uint8_t * n1,
+uint8_t * session_key /* Assume 32 bytes */){
     // wait to receive a response from the server
-    char client_payload[DH_KEY_SIZE + DH_NONCE_SIZE + AES_TAG_SIZE + 1024]; // 1024 is for padding
+    uint8_t client_payload[DH_KEY_SIZE + DH_NONCE_SIZE + AES_TAG_SIZE + 1024]; // 1024 is for padding
     int payload_len = recv(socket, client_payload, 
      sizeof(client_payload), 0);
     printf("[CLIENT] Received payload from server of size %d\n", payload_len);
-    char dhB_bytes[DH_KEY_SIZE];
-    char tag[AES_TAG_SIZE];
+    uint8_t dhB_bytes[DH_KEY_SIZE];
+    uint8_t tag[AES_TAG_SIZE];
     long ciphertext_len = payload_len - DH_KEY_SIZE - DH_NONCE_SIZE - AES_TAG_SIZE;
-    char ciphertext[ciphertext_len];
+    uint8_t ciphertext[ciphertext_len];
 
     memcpy(dhB_bytes, client_payload, DH_KEY_SIZE);
     memcpy(n1, client_payload + DH_KEY_SIZE, DH_NONCE_SIZE);
@@ -166,7 +166,7 @@ char * session_key /* Assume 32 bytes */){
 	mpz_export(master_key_bytes, NULL, 1, 1, 1, 0, master_key);
     mpz_clears(dhB_mpz,master_key,NULL);
 
-    char salt[DH_NONCE_SIZE*2];
+    uint8_t salt[DH_NONCE_SIZE*2];
     create_salt(salt,n0,n1);
     
     create_session_key(master_key_bytes, salt,session_key);
@@ -174,31 +174,27 @@ char * session_key /* Assume 32 bytes */){
     print_bytes(session_key, AES_KEY_SIZE);
 
     // decrypt the ciphertext and extract the signature, public key
-    unsigned char *plaintext = malloc(ciphertext_len);
+    uint8_t *plaintext = malloc(ciphertext_len);
     int plaintext_len = aes_decrypt(
-        (unsigned char *) ciphertext,
+        (uint8_t *) ciphertext,
         ciphertext_len,
         NULL, 0,
-        (unsigned char *) tag,
-        (unsigned char *) session_key,
-        (unsigned char *) n1,
+        (uint8_t *) tag,
+        (uint8_t *) session_key,
+        (uint8_t *) n1,
         DH_NONCE_SIZE,
         plaintext);
     plaintext_len = ciphertext_len;
     long signature_len = 256; // signature length is always 256
-    char signature[signature_len];
+    uint8_t signature[signature_len];
     long server_public_key_len = plaintext_len - signature_len;
-    char server_public_key[server_public_key_len];   
+    uint8_t server_public_key[server_public_key_len];   
     memcpy(signature, plaintext, signature_len);
     memcpy(server_public_key, plaintext + signature_len, server_public_key_len);
 
-    printf("[CLIENT] Signature: ");
-    print_bytes(signature, signature_len);
-    printf("[CLIENT] Server public key: ");
-    print_bytes(server_public_key, server_public_key_len);
     // print out server_public_key
 
-    char dhA_bytes[DH_KEY_SIZE];
+    uint8_t dhA_bytes[DH_KEY_SIZE];
     mpz_export(dhA_bytes, NULL, 1, 1, 1, 0, dhA_mpz);
     if (!is_server_response_sign_valid(n0,n1,dhA_bytes,dhB_bytes,signature, signature_len, server_public_key, server_public_key_len)){
         perror("[CLIENT] Server response is invalid\n");   
@@ -210,13 +206,13 @@ char * session_key /* Assume 32 bytes */){
 	return session_key;
 }
 
-char * client_get_session_key(int socket, char * session_key /* assumed 256 length */,
+uint8_t * client_get_session_key(int socket, uint8_t * session_key /* assumed 256 length */,
  gmp_randstate_t state){
 	mpz_t prime, dhA_mpz, a;
     mpz_init2(prime,DH_NUM_BITS);//make sure to call mpz_clear(); after using
-    char master_key[DH_KEY_SIZE];
-    char n0[DH_NONCE_SIZE];
-    char n1[DH_NONCE_SIZE];
+    uint8_t master_key[DH_KEY_SIZE];
+    uint8_t n0[DH_NONCE_SIZE];
+    uint8_t n1[DH_NONCE_SIZE];
     get_big_prime(prime,state);
 
     initialize_values(prime, dhA_mpz, a, state);
@@ -231,10 +227,10 @@ char * client_get_session_key(int socket, char * session_key /* assumed 256 leng
 // TLS IMPLEMENTATION - Server side
 
 // Diffie-Hellman key exchange
-void receive_client_hello(int socket, mpz_t prime, mpz_t dhA_mpz, gmp_randstate_t state,char* n0,char* n1)
+void receive_client_hello(int socket, mpz_t prime, mpz_t dhA_mpz, gmp_randstate_t state,uint8_t* n0,uint8_t* n1)
 {
     // receive p, dhA, nonce from client
-    char client_payload[DH_NUM_BITS + DH_KEY_SIZE + DH_NONCE_SIZE];
+    uint8_t client_payload[DH_NUM_BITS + DH_KEY_SIZE + DH_NONCE_SIZE];
     int payload_len = recv(socket, client_payload, 
     sizeof(client_payload), 0);
     printf("[SERVER] Received payload of size %d\n", payload_len);
@@ -246,8 +242,8 @@ void receive_client_hello(int socket, mpz_t prime, mpz_t dhA_mpz, gmp_randstate_
     
     // use mpz_import to convert back to mpz_t
     
-    char dhA_bytes[DH_KEY_SIZE];
-    char prime_bytes[DH_KEY_SIZE];
+    uint8_t dhA_bytes[DH_KEY_SIZE];
+    uint8_t prime_bytes[DH_KEY_SIZE];
 
     memcpy(prime_bytes, client_payload, DH_KEY_SIZE);
     memcpy(dhA_bytes, client_payload + DH_KEY_SIZE, DH_KEY_SIZE);
@@ -272,18 +268,18 @@ void receive_client_hello(int socket, mpz_t prime, mpz_t dhA_mpz, gmp_randstate_
 }
 
 static void sign_data_to_client(
-    char* n0,
-    char* n1,
-    char* dhA_bytes,
-    char* dhB_bytes,
-    char** signature, 
+    uint8_t* n0,
+    uint8_t* n1,
+    uint8_t* dhA_bytes,
+    uint8_t* dhB_bytes,
+    uint8_t** signature, 
     size_t * signature_len,
-    char *public_key, 
+    uint8_t *public_key, 
     size_t public_key_len,
     const char *private_key_file){
 
     // make data n0 + n1 + dhA + dhB + certificate
-    char data[DH_NONCE_SIZE*2 + DH_KEY_SIZE*2 + public_key_len];
+    uint8_t data[DH_NONCE_SIZE*2 + DH_KEY_SIZE*2 + public_key_len];
     memcpy(data, n0, DH_NONCE_SIZE);
     memcpy(data + DH_NONCE_SIZE, n1, DH_NONCE_SIZE);
     memcpy(data + DH_NONCE_SIZE*2, dhA_bytes, DH_KEY_SIZE);
@@ -295,11 +291,11 @@ static void sign_data_to_client(
     sign_data(private_key_file, data, data_len,signature,signature_len,"server");
 }
 
-char * send_server_hello(int socket,
+uint8_t * send_server_hello(int socket,
  mpz_t prime, 
  mpz_t dhA_mpz, 
- gmp_randstate_t state, char * master_key_bytes /* assume 256 bytes */,
- char * n0, char * n1, char * session_key /* assume 32 */){
+ gmp_randstate_t state, uint8_t * master_key_bytes /* assume 256 bytes */,
+ uint8_t * n0, uint8_t * n1, uint8_t * session_key /* assume 32 */){
     mpz_t b, g, dhB_mpz;
     initialize_values(prime,dhB_mpz,b,state);
     
@@ -312,32 +308,32 @@ char * send_server_hello(int socket,
 
     gmp_printf("[SERVER] Calculated dhB = %Zd, master key = %Zd\n", dhB_mpz, master_key);
     // convert dhB to string of bytes
-    char dhB_bytes[DH_KEY_SIZE];
+    uint8_t dhB_bytes[DH_KEY_SIZE];
     mpz_export(dhB_bytes, NULL, 1, 1, 1, 0, dhB_mpz);
 
     // get n1 nonce
     get_random_bytes(n1, DH_NONCE_SIZE, state);
 
     // get the session key for aes
-    char salt[DH_NONCE_SIZE*2];
+    uint8_t salt[DH_NONCE_SIZE*2];
     create_salt(salt,n0,n1);
     
     create_session_key(
-        (unsigned char *) master_key_bytes, 
-        (unsigned char *)salt,
-        (unsigned char *)session_key);
+        (uint8_t *) master_key_bytes, 
+        (uint8_t *)salt,
+        (uint8_t *)session_key);
     
     printf("[SERVER] Session key: ");
     print_bytes(session_key, AES_KEY_SIZE);
     printf("size of session key: %d\n", AES_KEY_SIZE);
 
     // convert dhA to string of bytes
-    char dhA_bytes[DH_KEY_SIZE];
+    uint8_t dhA_bytes[DH_KEY_SIZE];
     mpz_export(dhA_bytes, NULL, 1, 1, 1, 0, dhA_mpz);
     
     const char *private_key_file = "./keys/private.pem"; // should be the same for both client and server    
     // load public key
-    char *public_key;
+    uint8_t *public_key;
     size_t public_key_len;
     /* public key is malloced */
     get_public_key(
@@ -347,7 +343,7 @@ char * send_server_hello(int socket,
         "server"); // change password later
     
     // create the signed data
-    char * signature;
+    uint8_t * signature;
     size_t signed_len;
     /* signature is malloced */
     sign_data_to_client(
@@ -363,35 +359,28 @@ char * send_server_hello(int socket,
 
     // Concatenate signature and certificate
     size_t plaintext_len = signed_len + public_key_len;
-    char * plaintext = malloc(plaintext_len);
+    uint8_t * plaintext = malloc(plaintext_len);
     memcpy(plaintext, signature, signed_len);
     memcpy(plaintext + signed_len, public_key, public_key_len);
 
-    printf("[SERVER] signature: ");
-    print_bytes(signature, signed_len);
-    printf("[SERVER] public key: ");
-    print_bytes(public_key, public_key_len);
-
-    unsigned char tag[AES_TAG_SIZE];
-    unsigned char *ciphertext = malloc(plaintext_len);
+    uint8_t tag[AES_TAG_SIZE];
+    uint8_t *ciphertext = malloc(plaintext_len);
 
     int ciphertext_len = aes_encrypt(
-        (unsigned char *)plaintext,
+        (uint8_t *)plaintext,
         plaintext_len,
         NULL,
         0,
-        (unsigned char *)session_key,
-        (unsigned char *)n1,
+        (uint8_t *)session_key,
+        (uint8_t *)n1,
         DH_NONCE_SIZE,
         ciphertext,
         tag);
 
-    /* printf("[SERVER] Ciphertext");
-    print_bytes((char *)ciphertext, ciphertext_len); */
     printf("size of tag: %ld\n", sizeof(tag));
 
     size_t payload_len = DH_KEY_SIZE + DH_NONCE_SIZE + AES_TAG_SIZE + ciphertext_len;
-    char * server_payload = malloc(payload_len);
+    uint8_t * server_payload = malloc(payload_len);
 
     memcpy(server_payload, dhB_bytes, DH_KEY_SIZE);
     memcpy(server_payload + DH_KEY_SIZE, n1, DH_NONCE_SIZE);
@@ -410,11 +399,11 @@ char * send_server_hello(int socket,
     return master_key_bytes;
 }
 
-char * server_get_session_key(int socket,  char * session_key  /* assumed 32 length */,
+uint8_t * server_get_session_key(int socket,  uint8_t * session_key  /* assumed 32 length */,
  gmp_randstate_t state){
-    char master_key[DH_KEY_SIZE];
-    char n0[DH_NONCE_SIZE];
-    char n1[DH_NONCE_SIZE];
+    uint8_t master_key[DH_KEY_SIZE];
+    uint8_t n0[DH_NONCE_SIZE];
+    uint8_t n1[DH_NONCE_SIZE];
     mpz_t prime;
     mpz_t dhA_mpz;
     receive_client_hello(socket, prime, dhA_mpz, state, n0,n1);

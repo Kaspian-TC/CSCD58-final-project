@@ -1,4 +1,5 @@
 #include <gmp.h>
+#include <stdint.h>	
 
 #define BUFFER_SIZE 1048576 // 1 MB
 #define DH_NUM_BITS 2048
@@ -8,26 +9,26 @@
 #define AES_KEY_SIZE 32
 #define AES_TAG_SIZE 16
 
-void get_random_bytes(char *bytes, int length,gmp_randstate_t state);
+void get_random_bytes(uint8_t *bytes, int length,gmp_randstate_t state);
 void initialize_values(const mpz_t prime, mpz_t dhA_mpz, mpz_t a,
  gmp_randstate_t state);
-void print_bytes(char *bytes, int length);
-unsigned char *create_session_key(unsigned char *master_key, unsigned char *salt, unsigned char* session_key);
-void create_salt(char *salt, char *n0, char *n1);
+void print_bytes(uint8_t *bytes, int length);
+uint8_t *create_session_key(uint8_t *master_key, uint8_t *salt, uint8_t* session_key);
+void create_salt(uint8_t *salt, uint8_t *n0, uint8_t *n1);
 
 // aes functions
-int aes_encrypt(unsigned char *plaintext, int plaintext_len,
- unsigned char *aad, int aad_len,
- unsigned char *key,
- unsigned char *iv, int iv_len,
- unsigned char *ciphertext,
- unsigned char *tag);
+int aes_encrypt(uint8_t *plaintext, int plaintext_len,
+ uint8_t *aad, int aad_len,
+ uint8_t *key,
+ uint8_t *iv, int iv_len,
+ uint8_t *ciphertext,
+ uint8_t *tag);
 
-int aes_decrypt(unsigned char *ciphertext, int ciphertext_len,
-    unsigned char *aad, int aad_len,
-    unsigned char *tag,
-    unsigned char *key,
-    unsigned char *iv, int iv_len,
-    unsigned char *plaintext);
-int send_encypted_data(int socket, char *data, int data_len, char *session_key, gmp_randstate_t state);
-char * receive_encypted_data(int socket, int * data_len, char *session_key);
+int aes_decrypt(uint8_t *ciphertext, int ciphertext_len,
+    uint8_t *aad, int aad_len,
+    uint8_t *tag,
+    uint8_t *key,
+    uint8_t *iv, int iv_len,
+    uint8_t *plaintext);
+int send_encypted_data(int socket, uint8_t *data, int data_len, uint8_t *session_key, gmp_randstate_t state);
+uint8_t * receive_encypted_data(int socket, int * data_len, uint8_t *session_key);

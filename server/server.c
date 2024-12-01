@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -72,33 +73,50 @@ int main()
         printf("[SERVER] Connection established.\n");
 
         // the client is sending the payload for Diffie-Hellman key exchange
-        char session_key[AES_KEY_SIZE]; 
+        uint8_t session_key[AES_KEY_SIZE]; 
         
         server_get_session_key(new_s, session_key, state);
         
         printf("[SERVER] Session key: ");   
         print_bytes(session_key, AES_KEY_SIZE);
 
-        int data_len;
-        // receive encrypted data for the client
-        char * data = receive_encypted_data(new_s, &data_len,
-         session_key);
+        int continue_connection = 1;
+        while(continue_connection){
+            int data_len;
+            // receive encrypted data for the client
+            uint8_t * data = receive_encypted_data(new_s, &data_len,
+            session_key);
 
-        // print out the plaintext
-        printf("Plaintext: ");
-        for(int i = 0; i < data_len; i++){
-            printf("%c", data[i]);
+            // print out the plaintext
+            printf("Plaintext: ");
+            for(int i = 0; i < data_len; i++){
+                printf("%c", data[i]);
+            }
+            printf("\n");
+
+            // send back plaintext + current time to client
+            const char * format = "Current time: %d-%d-%d %d:%d:%d\n";
+            uint8_t * response = malloc(data_len + strlen(format));
+            memcpy(response, data, data_len);
+            time_t t = time(NULL);
+            struct tm tm = *localtime(&t);
+            char current_time[100];
+            sprintf(current_time, format , tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+            memcpy(response + data_len, current_time, strlen(current_time));
+            send_encypted_data(new_s, response, data_len + strlen(current_time), session_key, state);
+            
+
+            // close connection if client sends ">>> Ciao-Ciao"
+            if (strncmp((char *) data, ">>> Ciao-Ciao\n",data_len) == 0 || strncmp((char *)data, "Ciao-Ciao\n",data_len) == 0)
+            {
+                continue_connection = 0;
+            }
+
+            free(data);
+            free(response);
+
         }
-        printf("\n");
-        // send back plaintext + current time to client
-        const char * format = "Current time: %d-%d-%d %d:%d:%d\n";
-        char * response = malloc(data_len + strlen(format));
-        memcpy(response, data, data_len);
-        time_t t = time(NULL);
-        struct tm tm = *localtime(&t);
-        sprintf(response + data_len, format , tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
-        send_encypted_data(new_s, response, data_len + strlen(format), session_key, state);
-
         // close the connection
         close(new_s);
         printf("[SERVER] Connection closed.\n");

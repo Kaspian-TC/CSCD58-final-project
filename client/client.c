@@ -77,22 +77,36 @@ int main(int argc, char *argv[])
     printf("[CLIENT] Session key: ");   
     print_bytes(session_key, AES_KEY_SIZE);
 
-    char * string = "Hello, World!";
-    // send the encrypted data
-    send_encypted_data(s, string, strlen(string), session_key, state);
-    // receive the data
-    int data_len;
-    // receive encrypted data for the client
-    char * data = receive_encypted_data(s, &data_len,
-        session_key);
+    int continue_connection = 1;
+    while (continue_connection && fgets(buf, sizeof(buf), stdin))
+    {
+        len = strlen(buf) + 1;
+        // send the encrypted data
+        send_encypted_data(s, buf, len, session_key, state);
 
-    // print out the plaintext
-    printf("Plaintext: ");
-    for(int i = 0; i < data_len; i++){
-        printf("%c", data[i]);
-    }
-    printf("\n");
-
+            // receive the data
+        int data_len;
+        // receive encrypted data for the client
+        char * data = receive_encypted_data(s, &data_len,
+            session_key);
+		if (strcmp(buf, ">>> Ciao-Ciao\n") == 0 || strcmp(buf, "Ciao-Ciao\n") == 0)
+		{
+			close(s);
+			return 0;
+		}
+        // print out the plaintext
+        printf("Plaintext: ");
+        for(int i = 0; i < data_len; i++){
+            printf("%c", data[i]);
+        }
+        printf("\n");
+        // close connection if client sends ">>> Ciao-Ciao"
+        if (strcmp(buf, ">>> Ciao-Ciao\n") == 0 || strcmp(buf, "Ciao-Ciao\n") == 0)
+        {
+            continue_connection = 0;
+        }
+        free(data);
+	}
     // close the connection
     close(s);
     gmp_randclear(state); 

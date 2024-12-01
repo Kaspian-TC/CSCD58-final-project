@@ -15,7 +15,7 @@ void free_Mdctx_private(EVP_MD_CTX *mdctx, EVP_PKEY *private_key){
     EVP_PKEY_free(private_key);
 }
 
-int sign_data(const char *private_key_path /* string */,const  char *data, long data_len, char ** signature, size_t * signed_len, char * password) {
+int sign_data(const char *private_key_path /* string */,const  uint8_t *data, long data_len, uint8_t ** signature, size_t * signed_len, uint8_t * password) {
 
     // Load the private key FROM A FILE
     FILE *key_file = fopen(private_key_path, "r");
@@ -40,7 +40,7 @@ int sign_data(const char *private_key_path /* string */,const  char *data, long 
 
     // Assigns value to signature
     *signature = malloc(*signed_len);
-    EVP_DigestSignFinal(digest_context, (unsigned char*) *signature, signed_len);
+    EVP_DigestSignFinal(digest_context, (uint8_t*) *signature, signed_len);
     printf("Signature created successfully\n");
     
     // Clean up
@@ -55,7 +55,7 @@ int sign_data(const char *private_key_path /* string */,const  char *data, long 
     printf("\n"); */
     return EXIT_SUCCESS;
 }
-int validate_signed_data(const char *public_key_file, const char *data, long data_len, char * signature, size_t sig_len){    
+int validate_signed_data(const char *public_key_file, const uint8_t *data, long data_len, uint8_t * signature, size_t sig_len){    
     int returnval;
 
     // Load public key
@@ -79,7 +79,7 @@ int validate_signed_data(const char *public_key_file, const char *data, long dat
     EVP_DigestVerifyUpdate(digest_context, data, data_len);
     
     // Verify the signature
-    returnval = EVP_DigestVerifyFinal(digest_context, (unsigned char *)signature, sig_len);
+    returnval = EVP_DigestVerifyFinal(digest_context, (uint8_t *)signature, sig_len);
     
     // Cleanup
     EVP_MD_CTX_free(digest_context);
@@ -87,7 +87,7 @@ int validate_signed_data(const char *public_key_file, const char *data, long dat
     return returnval;
 }
 
-void get_public_key(const char *private_key_path, char **public_key, size_t *public_key_len,char * password){
+void get_public_key(const char *private_key_path, uint8_t **public_key, size_t *public_key_len,uint8_t * password){
     // Load the private key FROM A FILE
     FILE *key_file = fopen(private_key_path, "r");
     // load private key 
@@ -102,9 +102,9 @@ void get_public_key(const char *private_key_path, char **public_key, size_t *pub
     PEM_write_bio_PUBKEY(bio, private_key);
 
     // get A POINTER TO the public key in bio (does not allocate)
-    char *pem_data = NULL;
+    uint8_t *pem_data = NULL;
     long pem_len = BIO_get_mem_data(bio, &pem_data);
-    *public_key = (char *) malloc(pem_len);
+    *public_key = (uint8_t *) malloc(pem_len);
     *public_key_len = pem_len;
     memcpy(*public_key, pem_data, pem_len);
 

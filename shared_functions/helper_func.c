@@ -8,7 +8,7 @@
 #include <sys/socket.h>
 #include "helper_func.h"
 
-void get_random_bytes(char *bytes, int length,gmp_randstate_t state)
+void get_random_bytes(uint8_t *bytes, int length,gmp_randstate_t state)
 {
     mpz_t random_number;
     mpz_init2(random_number, 8 * length);
@@ -35,7 +35,7 @@ void initialize_values(const mpz_t prime, mpz_t dh, mpz_t secret,
 }
 
 // create the session key using HKDF 
-unsigned char *create_session_key(unsigned char *master_key, unsigned char *salt, unsigned char* session_key)
+uint8_t *create_session_key(uint8_t *master_key, uint8_t *salt, uint8_t* session_key)
 {
     EVP_KDF *kdf;
     EVP_KDF_CTX *kctx;
@@ -83,12 +83,12 @@ unsigned char *create_session_key(unsigned char *master_key, unsigned char *salt
 }
 
 /* assumed salt is DH_NONCE_SIZE * 2; n0, n1 are DH_NONCE_SIZE */
-void create_salt(char *salt, char *n0, char *n1){
+void create_salt(uint8_t *salt, uint8_t *n0, uint8_t *n1){
     memcpy(salt, n0, DH_NONCE_SIZE);
     memcpy(salt + DH_NONCE_SIZE, n1, DH_NONCE_SIZE);
 }
 
-void print_bytes(char *bytes, int length)
+void print_bytes(uint8_t *bytes, int length)
 {
 	for (int i = 0; i < length; i++)
 	{
@@ -100,12 +100,12 @@ void print_bytes(char *bytes, int length)
 
 
 // AES Decryption
-int aes_decrypt(unsigned char *ciphertext, int ciphertext_len,
- unsigned char *aad, int aad_len,
- unsigned char *tag,
- unsigned char *key,
- unsigned char *iv, int iv_len,
- unsigned char *plaintext){
+int aes_decrypt(uint8_t *ciphertext, int ciphertext_len,
+ uint8_t *aad, int aad_len,
+ uint8_t *tag,
+ uint8_t *key,
+ uint8_t *iv, int iv_len,
+ uint8_t *plaintext){
     EVP_CIPHER_CTX *ctx;
     int len;
     int plaintext_len;
@@ -154,12 +154,12 @@ int aes_decrypt(unsigned char *ciphertext, int ciphertext_len,
     }
 }
 
-int aes_encrypt(unsigned char *plaintext, int plaintext_len,
- unsigned char *aad, int aad_len,
- unsigned char *key,
- unsigned char *iv, int iv_len,
- unsigned char *ciphertext,
- unsigned char *tag){
+int aes_encrypt(uint8_t *plaintext, int plaintext_len,
+ uint8_t *aad, int aad_len,
+ uint8_t *key,
+ uint8_t *iv, int iv_len,
+ uint8_t *ciphertext,
+ uint8_t *tag){
     EVP_CIPHER_CTX *ctx;
     int len;
     int ciphertext_len;
@@ -204,26 +204,26 @@ int aes_encrypt(unsigned char *plaintext, int plaintext_len,
     return ciphertext_len;
 }
 
-int send_encypted_data(int socket, char *data, int data_len, char *session_key, gmp_randstate_t state){
-    unsigned char tag[AES_TAG_SIZE];
-    char nonce[DH_NONCE_SIZE];
+int send_encypted_data(int socket, uint8_t *data, int data_len, uint8_t *session_key, gmp_randstate_t state){
+    uint8_t tag[AES_TAG_SIZE];
+    uint8_t nonce[DH_NONCE_SIZE];
     // generate a nonce
     get_random_bytes(nonce, DH_NONCE_SIZE, state);
     // Encrypt the data
-    unsigned char *ciphertext = malloc(data_len);
+    uint8_t *ciphertext = malloc(data_len);
     int ciphertext_len = aes_encrypt(
-        (unsigned char *)data,
+        (uint8_t *)data,
         data_len,
         NULL,
         0,
-        (unsigned char *)session_key,
-        (unsigned char *)nonce,
+        (uint8_t *)session_key,
+        (uint8_t *)nonce,
         DH_NONCE_SIZE,
         ciphertext,
-        (unsigned char *)tag);
+        (uint8_t *)tag);
     // construct the payload (nonce + tag + ciphertext)
     int payload_len = DH_NONCE_SIZE + AES_TAG_SIZE + ciphertext_len;
-    char payload[payload_len];
+    uint8_t payload[payload_len];
     memcpy(payload, nonce, DH_NONCE_SIZE);
     memcpy(payload + DH_NONCE_SIZE, tag, AES_TAG_SIZE);
     memcpy(payload + DH_NONCE_SIZE + AES_TAG_SIZE, ciphertext, ciphertext_len);
@@ -235,14 +235,14 @@ int send_encypted_data(int socket, char *data, int data_len, char *session_key, 
     return payload_len;
 
 }
-char * receive_encypted_data(int socket, int * data_len, char *session_key){
-    char payload[DH_NONCE_SIZE + AES_TAG_SIZE + 1024];
+uint8_t * receive_encypted_data(int socket, int * data_len, uint8_t *session_key){
+    uint8_t payload[DH_NONCE_SIZE + AES_TAG_SIZE + 1024];
     int payload_len = recv(socket, payload, DH_NONCE_SIZE + AES_TAG_SIZE + 1024, 0);
     printf("Received payload of size %d\n", payload_len);
-    char nonce[DH_NONCE_SIZE];
-    char tag[AES_TAG_SIZE];
+    uint8_t nonce[DH_NONCE_SIZE];
+    uint8_t tag[AES_TAG_SIZE];
     long ciphertext_len = payload_len - DH_NONCE_SIZE - AES_TAG_SIZE;
-    char ciphertext[ciphertext_len];
+    uint8_t ciphertext[ciphertext_len];
 
     // add the nonce, tag, and ciphertext to payload
     memcpy(nonce, payload, DH_NONCE_SIZE);
@@ -250,18 +250,18 @@ char * receive_encypted_data(int socket, int * data_len, char *session_key){
     memcpy(ciphertext, payload + DH_NONCE_SIZE + AES_TAG_SIZE, ciphertext_len);
 
     // decrypt the ciphertext
-    unsigned char *plaintext = malloc(ciphertext_len);
+    uint8_t *plaintext = malloc(ciphertext_len);
     int plaintext_len = aes_decrypt(
-        (unsigned char *)ciphertext,
+        (uint8_t *)ciphertext,
         ciphertext_len,
         NULL, 0,
-        (unsigned char *)tag,
-        (unsigned char *)session_key,
-        (unsigned char *)nonce,
+        (uint8_t *)tag,
+        (uint8_t *)session_key,
+        (uint8_t *)nonce,
         DH_NONCE_SIZE,
         plaintext);
     
     
     *data_len = plaintext_len;
-    return (char *) plaintext;
+    return plaintext;
 }
