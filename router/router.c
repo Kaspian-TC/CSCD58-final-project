@@ -56,20 +56,20 @@ void handle_client(int client_sock) {
         printf("[ROUTER] Received: %s\n", buffer);
 
         if (strcmp(buffer, "RETRIEVE") == 0) {
-            char combined_response[MAX_LINE * NUM_SERVERS] = {0};
+            char formatted_response[MAX_LINE * NUM_SERVERS] = {0};
             for (int i = 0; i < NUM_SERVERS; i++) {
                 char server_response[MAX_LINE] = {0};
                 forward_to_server(server_ips[i], buffer, server_response);
 
-                // if server response is "NO_DATA", skip it
-                if (strcmp(server_response, "NO_DATA") == 0) {
-                    continue;
-                }
+                // Format the response to include server information
+                char formatted_server_response[MAX_LINE * 2];
+                snprintf(formatted_server_response, sizeof(formatted_server_response),
+                         "Server %d:\n%s\n", i + 1, server_response);
 
-                strncat(combined_response, server_response, sizeof(combined_response) - strlen(combined_response) - 1);
-                strncat(combined_response, "\n", sizeof(combined_response) - strlen(combined_response) - 1);
+                strncat(formatted_response, formatted_server_response,
+                        sizeof(formatted_response) - strlen(formatted_response) - 1);
             }
-            send(client_sock, combined_response, strlen(combined_response), 0);
+            send(client_sock, formatted_response, strlen(formatted_response), 0);
         } else {
             char server_response[MAX_LINE] = {0};
             const char* target_server_ip = server_ips[current_server];

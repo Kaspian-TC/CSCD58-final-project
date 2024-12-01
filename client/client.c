@@ -29,9 +29,15 @@ void retrieve_data(int sockfd) {
     send(sockfd, buffer, strlen(buffer), 0);
     printf("[CLIENT] Sent: %s\n", buffer);
 
-    char response[MAX_LINE * 3] = {0};
-    recv(sockfd, response, sizeof(response), 0);
-    printf("[CLIENT] Received: %s\n", response);
+    char response[MAX_LINE * 10] = {0};  // Adjust size as needed
+    int len = recv(sockfd, response, sizeof(response) - 1, 0);
+
+    if (len > 0) {
+        response[len] = '\0';
+        printf("[CLIENT] Received:\n%s\n", response);
+    } else {
+        printf("[CLIENT] No data received.\n");
+    }
 }
 
 int main(int argc, char** argv) {

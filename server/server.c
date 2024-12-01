@@ -5,23 +5,62 @@
 #include <netinet/in.h>
 #include "server.h"
 
-char global_data[MAX_LINE] = "";
+/* Global pointer to the head of the blockchain */
+Block* blockchain_head = NULL;
 
+/* Function to store data in a new block */
 void store_data(const char* payload) {
-    strncpy(global_data, payload, MAX_LINE - 1);
-    global_data[MAX_LINE - 1] = '\0';
-    printf("[SERVER] Stored: %s\n", global_data);
+    Block* new_block = (Block*)malloc(sizeof(Block));
+    if (!new_block) {
+        perror("[SERVER] Memory allocation failed");
+        return;
+    }
+
+    strncpy(new_block->data, payload, MAX_LINE - 1);
+    new_block->data[MAX_LINE - 1] = '\0';  // Ensure null-termination
+    new_block->next = NULL;
+
+    if (!blockchain_head) {
+        blockchain_head = new_block;  // First block in the chain
+    } else {
+        Block* current = blockchain_head;
+        while (current->next) {
+            current = current->next;  // Traverse to the end of the chain
+        }
+        current->next = new_block;  // Append the new block
+    }
+
+    printf("[SERVER] Stored new block: %s\n", payload);
 }
 
+/* Function to retrieve all data in the blockchain */
 void retrieve_data(int client_sock) {
-    if (strlen(global_data) > 0) {
-        send(client_sock, global_data, strlen(global_data), 0);
-        printf("[SERVER] Sent: %s\n", global_data);
+    char response[MAX_LINE * 10] = {0};  // Adjust size as needed for large data
+    Block* current = blockchain_head;
+
+    if (!current) {
+        snprintf(response, sizeof(response), "NO_DATA");
     } else {
-        const char* no_data = "NO_DATA";
-        send(client_sock, no_data, strlen(no_data), 0);
-        printf("[SERVER] No data to send.\n");
+        while (current) {
+            strncat(response, current->data, sizeof(response) - strlen(response) - 1);
+            strncat(response, "\n", sizeof(response) - strlen(response) - 1);
+            current = current->next;
+        }
     }
+
+    send(client_sock, response, strlen(response), 0);
+    printf("[SERVER] Sent blockchain data:\n%s", response);
+}
+
+/* Function to free the blockchain memory */
+void free_blockchain() {
+    Block* current = blockchain_head;
+    while (current) {
+        Block* temp = current;
+        current = current->next;
+        free(temp);
+    }
+    blockchain_head = NULL;
 }
 
 void handle_client(int client_sock) {
@@ -30,6 +69,8 @@ void handle_client(int client_sock) {
 
     if (len > 0) {
         buffer[len] = '\0';
+        printf("[SERVER] Received: %s\n", buffer);
+
         if (strcmp(buffer, "RETRIEVE") == 0) {
             retrieve_data(client_sock);
         } else {
@@ -37,18 +78,16 @@ void handle_client(int client_sock) {
             const char* ack = "DATA_STORED";
             send(client_sock, ack, strlen(ack), 0);
         }
+    } else {
+        printf("[SERVER] No data received, closing connection.\n");
     }
 
     close(client_sock);
 }
 
 int main() {
-    printf("[SERVER] Starting server process...\n");
-    // flush stdout to make sure the message is displayed
-    fflush(stdout);
-
-    int server_sock, client_sock;
     struct sockaddr_in server_addr, client_addr;
+    int server_sock, client_sock;
     socklen_t addr_len = sizeof(client_addr);
 
     server_sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -60,7 +99,7 @@ int main() {
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
-    server_addr.sin_port = htons(SERVER_PORT);
+    server_addr.sin_port = htons(5432);
 
     if (bind(server_sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
         perror("[SERVER] Bind failed");
@@ -74,7 +113,7 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    printf("[SERVER] Listening on port %d\n", SERVER_PORT);
+    printf("[SERVER] Listening on port 5432\n");
 
     while (1) {
         client_sock = accept(server_sock, (struct sockaddr*)&client_addr, &addr_len);
@@ -86,6 +125,7 @@ int main() {
         handle_client(client_sock);
     }
 
+    free_blockchain();  // Clean up memory
     close(server_sock);
     return 0;
 }
