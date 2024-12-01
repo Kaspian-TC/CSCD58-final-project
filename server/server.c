@@ -1,61 +1,97 @@
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <netinet/in.h>
+#include "server.h"
 
-void store_data(const char* filename, const char* key, const char* value) {
-    FILE* file = fopen(filename, "a+");
-    if (file == NULL) {
-        perror("Error opening file");
+// Function to store data locally in separate files for each block
+void store_data(const char* payload) {
+    static int block_id = 1; // Incremental block IDs
+    char filename[64];
+    snprintf(filename, sizeof(filename), "block%d.txt", block_id);
+
+    FILE* fp = fopen(filename, "w");
+    if (fp == NULL) {
+        perror("[STORAGE] Failed to create block file");
         return;
     }
-    fprintf(file, "%s=%s\n", key, value);
-    fclose(file);
+
+    fprintf(fp, "%s\n", payload);
+    fclose(fp);
+
+    printf("[STORAGE] Stored block in %s\n", filename);
+    block_id++;
 }
 
-const char* retrieve_data(const char* filename, const char* key) {
-    static char value[256];
-    char line[512];
-    FILE* file = fopen(filename, "r");
-    if (file == NULL) {
-        perror("Error opening file");
-        return "NOT_FOUND";
-    }
-    while (fgets(line, sizeof(line), file)) {
-        char file_key[256], file_value[256];
-        if (sscanf(line, "%255[^=]=%255s", file_key, file_value) == 2) {
-            if (strcmp(file_key, key) == 0) {
-                strcpy(value, file_value);
-                fclose(file);
-                return value;
-            }
+// Function to retrieve all stored blocks
+void retrieve_data(int socket) {
+    char buf[MAX_LINE];
+    char final_payload[MAX_LINE * 100] = {0};
+
+    for (int i = 1; i <= 100; i++) { // Assume a maximum of 100 blocks
+        char filename[64];
+        snprintf(filename, sizeof(filename), "block%d.txt", i);
+
+        FILE* fp = fopen(filename, "r");
+        if (fp == NULL) break; // Stop if no more blocks
+
+        while (fgets(buf, sizeof(buf), fp)) {
+            strcat(final_payload, buf);
         }
+        fclose(fp);
     }
-    fclose(file);
-    return "NOT_FOUND";
+
+    send(socket, final_payload, strlen(final_payload), 0);
+    printf("[STORAGE] Sent all stored blocks.\n");
 }
 
-int main(int argc, char* argv[]) {
-    const char* filename = "server_data.txt";  // Change this based on the server (e.g., server1.txt)
-    
-    if (argc < 2) {
-        fprintf(stderr, "Usage: %s --store key=value | --retrieve key\n", argv[0]);
-        return 1;
+int main() {
+    struct sockaddr_in sin;
+    char buf[MAX_LINE];
+    int len, s, new_s;
+
+    // Build address data structure
+    bzero((char*)&sin, sizeof(sin));
+    sin.sin_family = AF_INET;
+    sin.sin_addr.s_addr = INADDR_ANY;
+    sin.sin_port = htons(SERVER_PORT);
+
+    if ((s = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
+        perror("[STORAGE] Socket creation failed");
+        exit(1);
     }
 
-    if (strcmp(argv[1], "--store") == 0 && argc == 3) {
-        char key[256], value[256];
-        if (sscanf(argv[2], "%255[^=]=%255s", key, value) == 2) {
-            store_data(filename, key, value);
-            printf("Data stored: %s=%s\n", key, value);
+    if ((bind(s, (struct sockaddr*)&sin, sizeof(sin))) < 0) {
+        perror("[STORAGE] Binding failed");
+        close(s);
+        exit(1);
+    }
+
+    listen(s, 5);
+    printf("[STORAGE] Listening on port %d...\n", SERVER_PORT);
+
+    while (1) {
+        if ((new_s = accept(s, (struct sockaddr*)&sin, &len)) < 0) {
+            perror("[STORAGE] Accept failed");
+            close(s);
+            exit(1);
+        }
+
+        len = recv(new_s, buf, sizeof(buf) - 1, 0);
+        buf[len] = '\0';
+
+        if (strcmp(buf, "GET_DATA") == 0) {
+            printf("[STORAGE] Received data retrieval request\n");
+            retrieve_data(new_s);
         } else {
-            fprintf(stderr, "Invalid format for --store. Use key=value.\n");
+            printf("[STORAGE] Received data: %s\n", buf);
+            store_data(buf);
         }
-    } else if (strcmp(argv[1], "--retrieve") == 0 && argc == 3) {
-        const char* result = retrieve_data(filename, argv[2]);
-        printf("Retrieved: %s\n", result);
-    } else {
-        fprintf(stderr, "Invalid arguments.\n");
+
+        close(new_s);
     }
 
+    close(s);
     return 0;
 }
