@@ -10,12 +10,7 @@ void handle_openssl_error() {
     exit(EXIT_FAILURE);
 }
 
-void free_Mdctx_private(EVP_MD_CTX *mdctx, EVP_PKEY *private_key){
-    EVP_MD_CTX_free(mdctx);
-    EVP_PKEY_free(private_key);
-}
-
-int sign_data(const char *private_key_path /* string */,const  uint8_t *data, long data_len, uint8_t ** signature, size_t * signed_len, uint8_t * password) {
+int sign_data(const char *private_key_path /* string */,const  uint8_t *data, long data_len, uint8_t ** signature, size_t * signed_len, char * password) {
 
     // Load the private key FROM A FILE
     FILE *key_file = fopen(private_key_path, "r");
@@ -37,7 +32,6 @@ int sign_data(const char *private_key_path /* string */,const  uint8_t *data, lo
 
     // Finalize the signature (start by getting length)
     EVP_DigestSignFinal(digest_context, NULL, signed_len);
-
     // Assigns value to signature
     *signature = malloc(*signed_len);
     EVP_DigestSignFinal(digest_context, (uint8_t*) *signature, signed_len);
@@ -47,12 +41,6 @@ int sign_data(const char *private_key_path /* string */,const  uint8_t *data, lo
     EVP_MD_CTX_free(digest_context);
     EVP_PKEY_free(private_key);
 
-    /* printf("Signature: ");
-    for (int i = 0; i < *signed_len; i++)
-    {
-        printf("%02x", (*signature)[i]);
-    }
-    printf("\n"); */
     return EXIT_SUCCESS;
 }
 int validate_signed_data(const char *public_key_file, const uint8_t *data, long data_len, uint8_t * signature, size_t sig_len){    
@@ -87,7 +75,7 @@ int validate_signed_data(const char *public_key_file, const uint8_t *data, long 
     return returnval;
 }
 
-void get_public_key(const char *private_key_path, uint8_t **public_key, size_t *public_key_len,uint8_t * password){
+void get_public_key(const char *private_key_path, uint8_t **public_key, size_t *public_key_len,char * password){
     // Load the private key FROM A FILE
     FILE *key_file = fopen(private_key_path, "r");
     // load private key 
