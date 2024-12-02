@@ -3,10 +3,35 @@
 #include <string.h>
 #include <unistd.h>
 #include <netinet/in.h>
+#include <openssl/sha.h>
 #include "server.h"
 
 /* Global pointer to the head of the blockchain */
 Block* blockchain_head = NULL;
+
+/* Function to compute the hash for a block */
+void compute_hash(Block* block, const char* previous_hash, char* output_hash) {
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    char data_to_hash[MAX_LINE + HASH_SIZE] = {0};
+
+    // Combine block data and previous hash for hashing
+    snprintf(data_to_hash, sizeof(data_to_hash), "%s%s", block->data, previous_hash);
+
+    // Compute SHA-256 hash
+    SHA256((unsigned char*)data_to_hash, strlen(data_to_hash), hash);
+
+    // Convert the binary hash to a hexadecimal string
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
+        sprintf(output_hash + (i * 2), "%02x", hash[i]);
+    }
+
+    // Null-terminate the output hash
+    output_hash[HASH_SIZE - 1] = '\0';
+
+    // Store the previous hash in the block (unchanged)
+    strncpy(block->previous_hash, previous_hash, HASH_SIZE - 1);
+    block->previous_hash[HASH_SIZE - 1] = '\0';
+}
 
 /* Function to store data in a new block */
 void store_data(const char* payload) {
@@ -17,9 +42,23 @@ void store_data(const char* payload) {
     }
 
     strncpy(new_block->data, payload, MAX_LINE - 1);
-    new_block->data[MAX_LINE - 1] = '\0';  // Ensure null-termination
+    new_block->data[MAX_LINE - 1] = '\0';
     new_block->next = NULL;
 
+    char previous_hash[HASH_SIZE] = {0};
+    char computed_hash[HASH_SIZE] = {0};
+
+    if (blockchain_head) {
+        strncpy(previous_hash, blockchain_head->hash, HASH_SIZE - 1);
+        previous_hash[HASH_SIZE - 1] = '\0';
+    }
+
+    // Compute the hash and store it in the new block
+    compute_hash(new_block, previous_hash, computed_hash);
+    strncpy(new_block->hash, computed_hash, HASH_SIZE - 1);
+    new_block->hash[HASH_SIZE - 1] = '\0';
+
+    // Append the new block to the blockchain
     if (!blockchain_head) {
         blockchain_head = new_block;  // First block in the chain
     } else {
@@ -31,19 +70,38 @@ void store_data(const char* payload) {
     }
 
     printf("[SERVER] Stored new block: %s\n", payload);
+    printf("[SERVER] Block hash: %s\n", new_block->hash);
+
+    // Validate blockchain after storing data
+    if (!validate_blockchain()) {
+        printf("[SERVER] Blockchain validation failed after storing block.\n");
+    } else {
+        printf("[SERVER] Blockchain validation passed.\n");
+    }
 }
 
 /* Function to retrieve all data in the blockchain */
 void retrieve_data(int client_sock) {
     char response[MAX_LINE * 10] = {0};  // Adjust size as needed for large data
-    Block* current = blockchain_head;
 
+    // Validate blockchain before sending data
+    if (!validate_blockchain()) {
+        char response[] = "Blockchain validation failed. Data retrieval aborted.\n";
+
+        send(client_sock, response, strlen(response), 0);
+        return;
+    }
+
+    Block* current = blockchain_head;
     if (!current) {
         snprintf(response, sizeof(response), "NO_DATA");
     } else {
         while (current) {
-            strncat(response, current->data, sizeof(response) - strlen(response) - 1);
-            strncat(response, "\n", sizeof(response) - strlen(response) - 1);
+            char block_info[MAX_LINE + HASH_SIZE * 2 + 100];
+            snprintf(block_info, sizeof(block_info), "Data: %s\nHash: %s\nPrevious Hash: %s\n\n",
+                     current->data, current->hash, current->previous_hash);
+
+            strncat(response, block_info, sizeof(response) - strlen(response) - 1);
             current = current->next;
         }
     }
@@ -51,6 +109,39 @@ void retrieve_data(int client_sock) {
     send(client_sock, response, strlen(response), 0);
     printf("[SERVER] Sent blockchain data:\n%s", response);
 }
+
+
+/* Function to validate the blockchain */
+int validate_blockchain() {
+    Block* current = blockchain_head;
+    char expected_previous_hash[HASH_SIZE] = {0}; // Initialize empty hash for the first block
+    
+    while (current) {
+        char calculated_hash[HASH_SIZE] = {0};
+        compute_hash(current, expected_previous_hash, calculated_hash);
+
+        // validate the current block
+        if (strcmp(current->hash, calculated_hash) != 0) {
+            printf("[SERVER] Blockchain invalid: Tampered block detected.\n");
+            return 0;
+        }
+
+        // if not first block, validate the previous hash
+        if (current != blockchain_head && strcmp(current->previous_hash, expected_previous_hash) != 0) {
+            printf("[SERVER] Blockchain invalid: Previous hash mismatch.\n");
+            return 0;
+        }
+
+        // Update expected_previous_hash for the next block
+        strncpy(expected_previous_hash, current->hash, HASH_SIZE - 1);
+        expected_previous_hash[HASH_SIZE - 1] = '\0';
+        current = current->next;
+    }
+
+    printf("[SERVER] Blockchain is valid.\n");
+    return 1;
+}
+
 
 /* Function to free the blockchain memory */
 void free_blockchain() {
