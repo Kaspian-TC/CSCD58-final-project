@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -72,7 +73,7 @@ int main(int argc, char *argv[])
     gmp_randinit_mt(state);
     gmp_randseed_ui(state, time(NULL));
     
-    char session_key[AES_KEY_SIZE];
+    uint8_t session_key[AES_KEY_SIZE];
     client_get_session_key(s, session_key, state);
     printf("[CLIENT] Session key: ");   
     print_bytes(session_key, AES_KEY_SIZE);
