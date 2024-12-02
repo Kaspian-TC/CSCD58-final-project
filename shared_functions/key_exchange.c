@@ -17,7 +17,7 @@ void get_big_prime(mpz_t prime, gmp_randstate_t state)
 {
     mpz_t random_number;
     mpz_init(random_number);
-    mpz_urandomb(random_number, state, 2048);
+    mpz_urandomb(random_number, state, DH_NUM_BITS);
 
     mpz_nextprime(prime, random_number);
     
@@ -95,7 +95,9 @@ static void get_public_key_file(
 
 /* Helper function for receive_server_hello */
 static int is_server_response_sign_valid(
-    uint8_t* n0,uint8_t* n1,uint8_t* dhA_bytes,uint8_t* dhB_bytes,uint8_t* signature, long signature_len, uint8_t * public_key_file, size_t public_key_len){
+    uint8_t* n0,uint8_t* n1,uint8_t* dhA_bytes,uint8_t* dhB_bytes,
+    uint8_t* signature, long signature_len, uint8_t * public_key_file,
+    size_t public_key_len){
 
     // get the server's public key
     const char *server_public_key_file = "./keys/server.pem"; // here it should call the "CA"
@@ -227,7 +229,8 @@ uint8_t * client_get_session_key(int socket, uint8_t * session_key /* assumed 25
 // TLS IMPLEMENTATION - Server side
 
 // Diffie-Hellman key exchange
-void receive_client_hello(int socket, mpz_t prime, mpz_t dhA_mpz, gmp_randstate_t state,uint8_t* n0,uint8_t* n1)
+void receive_client_hello(int socket, mpz_t prime, mpz_t dhA_mpz,
+gmp_randstate_t state,uint8_t* n0,uint8_t* n1)
 {
     // receive p, dhA, nonce from client
     uint8_t client_payload[DH_NUM_BITS + DH_KEY_SIZE + DH_NONCE_SIZE];
