@@ -5,6 +5,8 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include "router.h"
+#include "../shared_functions/helper_func.h"
+#include "../shared_functions/key_exchange.h"
 
 #define NUM_SERVERS 3
 #define MAX_LINE 256
@@ -48,15 +50,32 @@ void forward_to_server(const char* server_ip, const char* message, char* respons
 }
 
 void handle_client(int client_sock) {
-    char buffer[MAX_LINE] = {0};
-    int len = recv(client_sock, buffer, sizeof(buffer) - 1, 0);
+    gmp_randstate_t state; // make sure to call gmp_randclear(state); 
+    // when done with state
+    gmp_randinit_mt(state);
+    gmp_randseed_ui(state, time(NULL));
+    uint8_t session_key[AES_KEY_SIZE]; 
+        
+    server_get_session_key(client_sock, session_key, state);
+    
+    printf("[ROUTER] Session key: ");   
+    print_bytes(session_key, AES_KEY_SIZE);
+    // char buffer[MAX_LINE] = {0};
+
+    int len;
+    uint8_t* ubuffer = receive_encypted_data(client_sock, &len,
+            session_key);
+    char buffer[len+1];
+    memcpy(buffer, ubuffer, len);
+    // len = recv(client_sock, buffer, sizeof(buffer) - 1, 0);
 
     if (len > 0) {
         buffer[len] = '\0';
         printf("[ROUTER] Received: %s\n", buffer);
 
+        char formatted_response[MAX_LINE * NUM_SERVERS] = {0};
+        int formatted_response_len = 0;
         if (strcmp(buffer, "RETRIEVE") == 0) {
-            char formatted_response[MAX_LINE * NUM_SERVERS] = {0};
             for (int i = 0; i < NUM_SERVERS; i++) {
                 char server_response[MAX_LINE] = {0};
                 forward_to_server(server_ips[i], buffer, server_response);
@@ -65,18 +84,21 @@ void handle_client(int client_sock) {
                 char formatted_server_response[MAX_LINE * 2];
                 snprintf(formatted_server_response, sizeof(formatted_server_response),
                          "Server %d:\n%s\n", i + 1, server_response);
-
+                formatted_response_len = strlen(formatted_response);
                 strncat(formatted_response, formatted_server_response,
-                        sizeof(formatted_response) - strlen(formatted_response) - 1);
+                        sizeof(formatted_response) - formatted_response_len - 1);
             }
-            send(client_sock, formatted_response, strlen(formatted_response), 0);
+            // send(client_sock, formatted_response, formatted_response_len, 0);
         } else {
-            char server_response[MAX_LINE] = {0};
+            char * server_response = formatted_response;
             const char* target_server_ip = server_ips[current_server];
             current_server = (current_server + 1) % NUM_SERVERS;
             forward_to_server(target_server_ip, buffer, server_response);
-            send(client_sock, server_response, strlen(server_response), 0);
+            formatted_response_len = strlen(server_response);
+            // send(client_sock, server_response, strlen(server_response), 0);
         }
+        send_encypted_data(client_sock, (uint8_t *)formatted_response, formatted_response_len, session_key,state);
+        // send(client_sock, formatted_response, formatted_response_len, 0);
     }
 
     close(client_sock);

@@ -56,7 +56,7 @@ void send_client_hello(int socket,
 
     printf("[CLIENT] Sending payload to server of size %ld\n",
      sizeof(payload));
-    gmp_printf("[CLIENT] p = %Zd, dhA = %Zd, nonce = \n", prime, dhA_mpz);
+    // gmp_printf("[CLIENT] p = %Zd, dhA = %Zd, nonce = \n", prime, dhA_mpz);
 
     // print nonce
     for (int i = 0; i < DH_NONCE_SIZE; i++)
@@ -158,12 +158,12 @@ uint8_t * session_key /* Assume 32 bytes */){
     mpz_init2(dhB_mpz,DH_NUM_BITS);
     mpz_import(dhB_mpz, DH_KEY_SIZE, 1, 1, 1, 0, dhB_bytes);
 
-    gmp_printf("[CLIENT] Received dhB = %Zd\n", dhB_mpz);
+    // gmp_printf("[CLIENT] Received dhB = %Zd\n", dhB_mpz);
 
     mpz_t master_key;
     mpz_init2(master_key, DH_NUM_BITS);
     mpz_powm(master_key,dhB_mpz,a,prime); // m = dhB^a mod p
-    gmp_printf("[CLIENT] master = %Zd\n", master_key);
+    // gmp_printf("[CLIENT] master = %Zd\n", master_key);
 	// convert master key to bytes
 	mpz_export(master_key_bytes, NULL, 1, 1, 1, 0, master_key);
     mpz_clears(dhB_mpz,master_key,NULL);
@@ -172,8 +172,6 @@ uint8_t * session_key /* Assume 32 bytes */){
     create_salt(salt,n0,n1);
     
     create_session_key(master_key_bytes, salt,session_key);
-    printf("[CLIENT] Session key: ");
-    print_bytes(session_key, AES_KEY_SIZE);
 
     // decrypt the ciphertext and extract the signature, public key
     uint8_t *plaintext = malloc(ciphertext_len);
@@ -259,7 +257,7 @@ gmp_randstate_t state,uint8_t* n0,uint8_t* n1)
     mpz_init2(dhA_mpz,DH_NUM_BITS);
     mpz_import(dhA_mpz, DH_KEY_SIZE, 1, 1, 1, 0, dhA_bytes);
 
-    gmp_printf("[SERVER] Received p = %Zd, dhA = %Zd, nonce = %d\n", prime, dhA_mpz, n0[0]);
+    // gmp_printf("[SERVER] Received p = %Zd, dhA = %Zd, nonce = %d\n", prime, dhA_mpz, n0[0]);
 
     // print n0
     printf("[SERVER] Received nonce: ");
@@ -309,7 +307,7 @@ uint8_t * send_server_hello(int socket,
     mpz_export(master_key_bytes, NULL, 1, 1, 1, 0, master_key);
 
 
-    gmp_printf("[SERVER] Calculated dhB = %Zd, master key = %Zd\n", dhB_mpz, master_key);
+    // gmp_printf("[SERVER] Calculated dhB = %Zd, master key = %Zd\n", dhB_mpz, master_key);
     // convert dhB to string of bytes
     uint8_t dhB_bytes[DH_KEY_SIZE];
     mpz_export(dhB_bytes, NULL, 1, 1, 1, 0, dhB_mpz);
@@ -325,10 +323,6 @@ uint8_t * send_server_hello(int socket,
         (uint8_t *) master_key_bytes, 
         (uint8_t *)salt,
         (uint8_t *)session_key);
-    
-    printf("[SERVER] Session key: ");
-    print_bytes(session_key, AES_KEY_SIZE);
-    printf("size of session key: %d\n", AES_KEY_SIZE);
 
     // convert dhA to string of bytes
     uint8_t dhA_bytes[DH_KEY_SIZE];

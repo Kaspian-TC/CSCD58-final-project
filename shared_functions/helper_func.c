@@ -23,7 +23,7 @@ void initialize_values(const mpz_t prime, mpz_t dh, mpz_t secret,
     
     mpz_init2(dh,DH_NUM_BITS);
     
-    gmp_printf("Prime number: %Zd\n", prime);
+    // gmp_printf("Prime number: %Zd\n", prime);
 
     mpz_urandomb(secret, state, DH_NUM_BITS);
     // compute dh = g^secret mod p
@@ -73,12 +73,6 @@ uint8_t *create_session_key(uint8_t *master_key, uint8_t *salt, uint8_t* session
         ERR_print_errors_fp(stderr);
     }
     EVP_KDF_CTX_free(kctx);
-    /* printf("Session key: ");
-    for (int i = 0; i < AES_KEY_SIZE; i++)
-    {
-        printf("%02x", session_key[i]);
-    }
-    printf("length of session key: %ld\n", sizeof(session_key)); */
     return session_key;
 }
 

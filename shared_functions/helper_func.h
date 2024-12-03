@@ -1,7 +1,7 @@
 #include <gmp.h>
 #include <stdint.h>	
 
-#define BUFFER_SIZE 1048576 // 1 MB
+// #define BUFFER_SIZE 1048576 // 1 MB
 #define DH_NUM_BITS 2048
 #define DH_G 5
 #define DH_KEY_SIZE 256
