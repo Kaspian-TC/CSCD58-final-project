@@ -23,7 +23,7 @@ def deploy_and_run(net):
         net.get(host).cmd(f'cp /home/mininet/mininet_project/server/server /tmp/project/')
         net.get(host).cmd('chmod +x /tmp/project/server')
 
-    print("Starting programs on Mininet hosts...")
+    """ print("Starting programs on Mininet hosts...")
 
     # Start router on h2
     net.get('h2').cmd('/tmp/project/router &')
@@ -41,7 +41,7 @@ def deploy_and_run(net):
 
     print("Running --retrieve operation...")
     client_output_retrieve = net.get('h1').cmd('/tmp/project/client --retrieve 10.0.0.2')
-    print(client_output_retrieve)
+    print(client_output_retrieve) """
 
 if __name__ == '__main__':
     net = custom_topology()

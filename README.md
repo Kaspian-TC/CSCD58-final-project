@@ -1,5 +1,3 @@
-need to update openssl to latest version
-
 # Group members
 
 - Kaspian Thoft-Christensen
@@ -41,6 +39,8 @@ The primary features of the security protocol include:
 ## How to run tests
 
 ## Implementation details and documentation
+
+### Alternative execution
 
 ### key_exchange.c
 
