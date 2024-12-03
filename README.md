@@ -1,28 +1,67 @@
-# Group members
+# Group Members
 
-- Kaspian Thoft-Christensen
-	- chris473
-    - 1007066336
-- Jerry Han
-    - hanmiao1
-    - 1007423566
-- Ankit Shrivastava
-    - shriva53
-    - 1006884409
+- **Kaspian Thoft-Christensen**
+  - Username: chris473
+  - Student ID: 1007066336
+- **Jerry Han**
+  - Username: hanmiao1
+  - Student ID: 1007423566
+- **Ankit Shrivastava**
+  - Username: shriva53
+  - Student ID: 1006884409
 
-# Report
+# Project Description
 
-## Project description
+This project is a custom network security protocol designed to secure data transmission between a client and server, leveraging key features of TLS. It also implements a distributed server system where data is split among multiple servers, all while using the security protocol for communication.
 
-This project is a custom network security protocol that secures data transmission between a client and a server, using the key features in TLS. It also implements a distributed server, such that data is split among multiple servers, using the previously mentional security protocol to communicate.
+### Primary Features
 
-The primary features of the security protocol include:
+- **Secure Key Exchange:** Implements Diffie-Hellman key exchange algorithm.
+- **Data Encryption:** Uses AES for encryption of transmitted data.
+- **Certificate Authority:** Includes a basic certificate authority for signing and verifying certificates.
+- **Distributed Database:** Implements a sharded database with three servers, where data is split and stored securely.
 
-- Securly exchanging keys using the Diffie-Hellman key exchange algorithm 
-- Encrypting the data using AES
-- Signing data, and checking certificates
-    - Having a basic certificate authority to get certificates from
-- A distributed server system that stores splits data between three servers
+# Distributed Blockchain Database
+
+This project mimics a blockchain-style distributed database system.
+
+### Blockchain Overview
+
+- **Blockchain Structure:** A blockchain is a linked list of blocks containing:
+  - Data.
+  - The current hash of the block.
+  - The hash of the previous block.
+- **Tamper Detection:** If a block is tampered with, its hash will no longer match the `previous_hash` field of the next block, ensuring integrity.
+
+### Our Setup
+
+- **Sharded Database:** The project uses sharding with one router coordinating three shards/servers. Each shard has its own blockchain.
+- **Blockchain Validation:** Each server maintains its own chain and validates it to detect tampering.
+- **TLS Encryption:** All communication between the client, router, and servers is encrypted using TLS.
+
+### Workflow
+
+1. **Storing Data:**
+   - The client sends a store request with a payload to the router.
+   - The router forwards the request to one of the shards/servers in a round-robin fashion.
+   - The shard stores the data in a linked list of blocks (its blockchain).
+
+2. **Retrieving Data:**
+   - The client sends a retrieve request to the router.
+   - The router queries all shards/servers and retrieves their blockchain data.
+   - The router concatenates the data and returns it to the client.
+
+### Block Structure
+
+Each block in the blockchain contains:
+```c
+typedef struct Block {
+    char data[MAX_LINE];
+    char hash[HASH_SIZE];
+    char previous_hash[HASH_SIZE];
+    struct Block* next;
+} Block;
+```
 
 ## Team member contribution
 
@@ -191,8 +230,25 @@ gmp_randstate_t state,uint8_t* n0,uint8_t* n1)`
 
 - Processes receiving data, and unencrypt it using the session key provided
 
-## Analysis and discussion
+## Analysis and Discussion
+
+
+This project demonstrates a secure and efficient method of transmitting data using TLS-like encryption and a distributed blockchain-based database. Here are key insights and potential extensions for the system:
+
+### Extending the Network
+
+- **Multiple Nodes Per Shard:** 
+  - Currently, each shard contains only one server (node). The network can be extended to include multiple nodes per shard.
+  - Each node within a shard would maintain a copy of the shard's blockchain, ensuring redundancy and fault tolerance.
+  - Nodes within a shard can synchronize their blockchains periodically to ensure data consistency.
+
+- **Basic Proof of Work:**
+  - Each shard could implement a lightweight version of blockchain proof-of-work (PoW).
+  - Before storing a block, nodes would solve a simple computational puzzle to validate the block. This would prevent malicious or invalid data from being added to the blockchain.
+
+- **Inter-Node Communication:**
+  - Nodes within a shard can communicate to reach a consensus before adding a new block or responding to a retrieve request.
+  - Consensus protocols, such as a simplified version of Raft or Paxos, can be implemented to enhance reliability.
+
 
 ## Concluding remarks
-
-
