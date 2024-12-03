@@ -199,6 +199,8 @@ gmp_randstate_t state,uint8_t* n0,uint8_t* n1)`
 
 - Given the master key computed using the diffie-hellman exchange, and a salt(client nonce + server nonce), create an HKDF key for encrypting using AES-256-GCM 
 
+### helper_func.c
+
 `int aes_decrypt(uint8_t *ciphertext, int ciphertext_len,
  uint8_t *aad, int aad_len,
  uint8_t *tag,
@@ -229,6 +231,10 @@ gmp_randstate_t state,uint8_t* n0,uint8_t* n1)`
 `uint8_t * receive_encypted_data(int socket, int * data_len, uint8_t *session_key)`
 
 - Processes receiving data, and unencrypt it using the session key provided
+
+### scripts
+
+
 
 ## Analysis and Discussion
 
