@@ -24,6 +24,7 @@ void store_data(int sockfd,gmp_randstate_t state, uint8_t * session_key /* Assum
     generate_random_data(buffer, buffer_length);
 
     send_encypted_data(sockfd, (uint8_t *)buffer, buffer_length, session_key, state);
+    printf("[CLIENT] Sent: %d\n", buffer_length);
 
     /* send(sockfd, buffer, strlen(buffer), 0);
     printf("[CLIENT] Sent: %s\n", buffer); */
@@ -36,6 +37,7 @@ void store_data(int sockfd,gmp_randstate_t state, uint8_t * session_key /* Assum
 
     /* recv(sockfd, response, sizeof(response), 0);
     printf("[CLIENT] Received: %s\n", response); */
+    free(response);
 }
 
 void retrieve_data(int sockfd,gmp_randstate_t state, uint8_t * session_key /* Assumed AES_BYTES long */) {

@@ -3,9 +3,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 #include <netinet/in.h>
 #include <openssl/sha.h>
 #include "server.h"
+#include "../shared_functions/helper_func.h"
+#include "../shared_functions/key_exchange.h"
 
 /* Global pointer to the head of the blockchain */
 Block* blockchain_head = NULL;
@@ -82,33 +85,33 @@ void store_data(const char* payload) {
 }
 
 /* Function to retrieve all data in the blockchain */
-void retrieve_data(int client_sock) {
-    char response[MAX_LINE * 10] = {0};  // Adjust size as needed for large data
-
+void retrieve_data(int client_sock, char* response, int* response_length) {
+    
+    const int max_response_length = MAX_LINE * 10;  // Adjust size as needed for large data
     // Validate blockchain before sending data
     if (!validate_blockchain()) {
-        char response[] = "Blockchain validation failed. Data retrieval aborted.\n";
-
-        send(client_sock, response, strlen(response), 0);
-        return;
+        char fail_response[] = "Blockchain validation failed. Data retrieval aborted.\n";
+        memcpy(response, fail_response, sizeof(fail_response));
+        // send(client_sock, response, strlen(response), 0);
+        // return;
     }
+    else{
+        Block* current = blockchain_head;
+        if (!current) {
+            snprintf(response, max_response_length, "NO_DATA");
+        } else {
+            while (current) {
+                char block_info[MAX_LINE + HASH_SIZE * 2 + 100];
+                snprintf(block_info, sizeof(block_info), "Data: %s\nHash: %s\nPrevious Hash: %s\n\n",
+                        current->data, current->hash, current->previous_hash);
 
-    Block* current = blockchain_head;
-    if (!current) {
-        snprintf(response, sizeof(response), "NO_DATA");
-    } else {
-        while (current) {
-            char block_info[MAX_LINE + HASH_SIZE * 2 + 100];
-            snprintf(block_info, sizeof(block_info), "Data: %s\nHash: %s\nPrevious Hash: %s\n\n",
-                     current->data, current->hash, current->previous_hash);
-
-            strncat(response, block_info, sizeof(response) - strlen(response) - 1);
-            current = current->next;
+                strncat(response, block_info, max_response_length - strlen(response) - 1);
+                current = current->next;
+            }
         }
+        printf("[SERVER] Sent blockchain data:\n%s", response);
     }
-
-    send(client_sock, response, strlen(response), 0);
-    printf("[SERVER] Sent blockchain data:\n%s", response);
+    *response_length = strlen(response);
 }
 
 
@@ -122,13 +125,13 @@ int validate_blockchain() {
         compute_hash(current, expected_previous_hash, calculated_hash);
 
         // validate the current block
-        if (strcmp(current->hash, calculated_hash) != 0) {
+        if (strncmp(current->hash, calculated_hash,HASH_SIZE-1) != 0) {
             printf("[SERVER] Blockchain invalid: Tampered block detected.\n");
             return 0;
         }
 
         // if not first block, validate the previous hash
-        if (current != blockchain_head && strcmp(current->previous_hash, expected_previous_hash) != 0) {
+        if (current != blockchain_head && strncmp(current->previous_hash, expected_previous_hash,HASH_SIZE-1) != 0) {
             printf("[SERVER] Blockchain invalid: Previous hash mismatch.\n");
             return 0;
         }
@@ -155,21 +158,39 @@ void free_blockchain() {
     blockchain_head = NULL;
 }
 
-void handle_client(int client_sock) {
+void handle_client(int client_sock,gmp_randstate_t state) {
+    // open session with client
+    uint8_t session_key[AES_KEY_SIZE];
+    server_get_session_key(client_sock, session_key, state);
+    // receive data from client
+    int len;
+    uint8_t* ubuffer = receive_encypted_data(client_sock, &len, session_key);
     char buffer[MAX_LINE] = {0};
-    int len = recv(client_sock, buffer, sizeof(buffer) - 1, 0);
+    memcpy(buffer, ubuffer, len);
+    free(ubuffer);
+    // int len = recv(client_sock, buffer, sizeof(buffer) - 1, 0);
 
     if (len > 0) {
         buffer[len] = '\0';
         printf("[SERVER] Received: %s\n", buffer);
 
+        char response[MAX_LINE * 10] = {0};  // Adjust size as needed for large data
+        int response_length;
         if (strcmp(buffer, "RETRIEVE") == 0) {
-            retrieve_data(client_sock);
+            retrieve_data(client_sock, response,&response_length);
+            // send the data to the client
+            // send(client_sock, response, response_length, 0);
         } else {
             store_data(buffer);
             const char* ack = "DATA_STORED";
-            send(client_sock, ack, strlen(ack), 0);
+            response_length = strlen(ack);
+            memcpy(response, ack, response_length);
+            // send(client_sock, response, response_length, 0);
         }
+        // send the data to the client
+        send_encypted_data(client_sock,
+         (uint8_t *)response,
+         response_length, session_key,state);
     } else {
         printf("[SERVER] No data received, closing connection.\n");
     }
@@ -187,6 +208,8 @@ int main() {
         perror("[SERVER] Socket creation failed");
         exit(EXIT_FAILURE);
     }
+    int option = 1;
+    setsockopt(server_sock, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
 
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
@@ -207,6 +230,10 @@ int main() {
 
     printf("[SERVER] Listening on port 5432\n");
 
+    gmp_randstate_t state; // make sure to call gmp_randclear(state); 
+    // when done with state
+    gmp_randinit_mt(state);
+    gmp_randseed_ui(state, time(NULL));
     while (1) {
         client_sock = accept(server_sock, (struct sockaddr*)&client_addr, &addr_len);
         if (client_sock < 0) {
@@ -214,7 +241,7 @@ int main() {
             continue;
         }
 
-        handle_client(client_sock);
+        handle_client(client_sock,state);
     }
 
     free_blockchain();  // Clean up memory

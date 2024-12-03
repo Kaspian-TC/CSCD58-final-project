@@ -144,6 +144,8 @@ int aes_decrypt(uint8_t *ciphertext, int ciphertext_len,
         plaintext_len += len;
         return plaintext_len;
     } else {
+        ERR_print_errors_fp(stdin);
+        ERR_get_error();
         return -1;
     }
 }
@@ -221,7 +223,7 @@ int send_encypted_data(int socket, uint8_t *data, int data_len, uint8_t *session
     memcpy(payload, nonce, DH_NONCE_SIZE);
     memcpy(payload + DH_NONCE_SIZE, tag, AES_TAG_SIZE);
     memcpy(payload + DH_NONCE_SIZE + AES_TAG_SIZE, ciphertext, ciphertext_len);
-
+    printf("Sending payload of size %d\n", payload_len);
     free(ciphertext);
     // send the payload
     send(socket, payload, payload_len, 0);
@@ -230,8 +232,8 @@ int send_encypted_data(int socket, uint8_t *data, int data_len, uint8_t *session
 
 }
 uint8_t * receive_encypted_data(int socket, int * data_len, uint8_t *session_key){
-    uint8_t payload[DH_NONCE_SIZE + AES_TAG_SIZE + 1024];
-    int payload_len = recv(socket, payload, DH_NONCE_SIZE + AES_TAG_SIZE + 1024, 0);
+    uint8_t payload[DH_NONCE_SIZE + AES_TAG_SIZE + 2048];
+    int payload_len = recv(socket, payload, DH_NONCE_SIZE + AES_TAG_SIZE + 2048, 0);
     printf("Received payload of size %d\n", payload_len);
     uint8_t nonce[DH_NONCE_SIZE];
     uint8_t tag[AES_TAG_SIZE];
@@ -244,18 +246,23 @@ uint8_t * receive_encypted_data(int socket, int * data_len, uint8_t *session_key
     memcpy(ciphertext, payload + DH_NONCE_SIZE + AES_TAG_SIZE, ciphertext_len);
 
     // decrypt the ciphertext
-    uint8_t *plaintext = malloc(ciphertext_len);
-    int plaintext_len = aes_decrypt(
-        (uint8_t *)ciphertext,
-        ciphertext_len,
-        NULL, 0,
-        (uint8_t *)tag,
-        (uint8_t *)session_key,
-        (uint8_t *)nonce,
-        DH_NONCE_SIZE,
-        plaintext);
+    uint8_t *plaintext = malloc(ciphertext_len * 2); // double the size to be safe
+    int plaintext_len;
+
+    plaintext_len = aes_decrypt(
+    ciphertext,
+    ciphertext_len,
+    NULL, 0,
+    tag,
+    session_key,
+    nonce,
+    DH_NONCE_SIZE,
+    plaintext);
+    if(plaintext_len < 0){
+        perror("Plaintext decryption error");
+    }
     
-    
-    *data_len = plaintext_len;
+    printf("Received plaintext of size %d\n", plaintext_len);
+    *data_len = plaintext_len; 
     return plaintext;
 }

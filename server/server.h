@@ -18,7 +18,7 @@ extern Block* blockchain_head;
 
 /* Function Headers */
 void store_data(const char* payload);
-void retrieve_data(int client_sock);
+void retrieve_data(int client_sock, char* response, int* response_length);
 void free_blockchain();
 void compute_hash(Block* block, const char* previous_hash, char* output_hash);
 int validate_blockchain();

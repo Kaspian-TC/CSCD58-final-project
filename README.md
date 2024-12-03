@@ -1,3 +1,5 @@
+need to update openssl to latest version
+
 # Group members
 
 - Kaspian Thoft-Christensen

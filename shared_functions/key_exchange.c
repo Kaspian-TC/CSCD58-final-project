@@ -111,6 +111,12 @@ static int is_server_response_sign_valid(
          &server_public_key_len);
     // compare read in public key with the public key from the server
     if (strncmp((char *)server_public_key, (char *)public_key_file, public_key_len) != 0){
+        perror("[CLIENT] Server public key does not match\n");
+        // print out both for debugging
+        for(int i = 0; i < server_public_key_len; i++){
+            printf("%c", server_public_key[i]);
+        }
+        printf("\n");
         free(server_public_key);
         return 0;
     }
@@ -353,6 +359,7 @@ uint8_t * send_server_hello(int socket,
         public_key,
         public_key_len, 
         private_key_file);
+    printf("[SERVER] Signature length: %ld\n", signed_len);
 
     // Concatenate signature and certificate
     size_t plaintext_len = signed_len + public_key_len;
