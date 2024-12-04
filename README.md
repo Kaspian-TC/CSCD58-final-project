@@ -106,7 +106,6 @@ Ideally, the .ova file will find its way, and this setup will not be required, b
 
 ### Running the tests
 
-
 - First start by setting the X11 magic cookie as the same for the root user (make sure you connect over ssh)
 - Navigate to `mininet_project` and compile and the necessariy code by running `./compile_all.sh`. Then to start the topology, run `sudo deploy_and_run.py`.
     - For some unknown reason, this sometimes does not work. Some fixes have been
@@ -131,10 +130,6 @@ Ideally, the .ova file will find its way, and this setup will not be required, b
 - Now you can communicate with the server. Everything sent to the server gets sent back with a timestamp, just like in A1.
 
 ## Implementation details and documentation
-
-
- 
-
 
 ### key_exchange.c
 
@@ -239,53 +234,6 @@ gmp_randstate_t state,uint8_t* n0,uint8_t* n1)`
 
 - Produces a public key from a private key, without having to create a file for it. 
 - This is used when the server needs to send the certificate (their public key) to the client
-
-`void get_random_bytes(uint8_t *bytes, int length,gmp_randstate_t state)`
-
-- Generates an array of random bytes given a length, and state
-
-`void initialize_values(const mpz_t prime, mpz_t dh, mpz_t secret,
- gmp_randstate_t state)`
-
-- Computes the dh (g^secret mod p) for a given a large prime
-- Also computes the secret number
-
-`uint8_t *create_session_key(uint8_t *master_key, uint8_t *salt, uint8_t* session_key)`
-
-- Given the master key computed using the diffie-hellman exchange, and a salt(client nonce + server nonce), create an HKDF key for encrypting using AES-256-GCM 
-
-### helper_func.c
-
-`int aes_decrypt(uint8_t *ciphertext, int ciphertext_len,
- uint8_t *aad, int aad_len,
- uint8_t *tag,
- uint8_t *key,
- uint8_t *iv, int iv_len,
- uint8_t *plaintext)`
-
-- Decrypt a given ciphertext with a key, and output it into a plaintext
-- Uses a nonce to decrypt it (from the sender of the data)
-- Check to make sure that the tag verifies the encryption signature
-
-`int aes_encrypt(uint8_t *plaintext, int plaintext_len,
- uint8_t *aad, int aad_len,
- uint8_t *key,
- uint8_t *iv, int iv_len,
- uint8_t *ciphertext,
- uint8_t *tag)`
-
-- Encrypt a given plaintext with a key, and output it into a ciphertext
-- Uses a nonce to encrypt
-- Also outputs a tag
-
-`int send_encypted_data(int socket, uint8_t *data, int data_len, uint8_t *session_key, gmp_randstate_t state)`
-
-- Given a socket id, data to be sent, and a hkdf session key, send encrypted data to the socket id
-- This function makes sure to use a randomly generated nonce to encrypt the data
-
-`uint8_t * receive_encypted_data(int socket, int * data_len, uint8_t *session_key)`
-
-- Processes receiving data, and unencrypt it using the session key provided
 
 ### scripts
 ### helper_func.c
@@ -440,3 +388,5 @@ This project demonstrates a secure and efficient method of transmitting data usi
 
 
 ## Concluding remarks
+
+This assignment really made us realize how difficult it is to parse data between a client and server, especially using sockets in C. Using mininet for the distributed systems was not the easiest either, and led to many issues. In the future, it might be easier to use another form of simulating a network.
