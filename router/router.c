@@ -64,8 +64,8 @@ void handle_client(int client_sock,gmp_randstate_t state) {
         
     server_get_session_key(client_sock, session_key, state);
     
-    printf("[ROUTER] Session key: ");   
-    print_bytes(session_key, AES_KEY_SIZE);
+    /* printf("[ROUTER] Session key: ");   
+    print_bytes(session_key, AES_KEY_SIZE); */
     // char buffer[MAX_LINE] = {0};
 
     int len;

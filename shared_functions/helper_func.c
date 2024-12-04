@@ -260,6 +260,7 @@ uint8_t * receive_encypted_data(int socket, int * data_len, uint8_t *session_key
     plaintext);
     if(plaintext_len < 0){
         perror("Plaintext decryption error");
+        exit(1);
     }
     
     printf("Received plaintext of size %d\n", plaintext_len);

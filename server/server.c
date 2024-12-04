@@ -109,7 +109,7 @@ void retrieve_data(int client_sock, char* response, int* response_length) {
                 current = current->next;
             }
         }
-        printf("[SERVER] Sent blockchain data:\n%s", response);
+        printf("[SERVER] Sent blockchain data:\n%s\n", response);
     }
     *response_length = strlen(response);
 }

@@ -49,7 +49,7 @@ void send_client_hello(int socket,
     // send p, dhA, nonce to server
     // payload = p (bytes) + dhA (bytes) + nonce (bytes)
     uint8_t payload[DH_KEY_SIZE + DH_KEY_SIZE + DH_NONCE_SIZE];
-    memcpy(payload, prime_bytes, sizeof(prime_bytes));
+    memcpy(payload, prime_bytes, DH_KEY_SIZE);
     memcpy(payload + DH_KEY_SIZE, dhA_bytes, DH_KEY_SIZE);
     memcpy(payload + DH_KEY_SIZE + DH_KEY_SIZE, n0,
      DH_NONCE_SIZE);
@@ -57,13 +57,6 @@ void send_client_hello(int socket,
     printf("[CLIENT] Sending payload to server of size %ld\n",
      sizeof(payload));
     // gmp_printf("[CLIENT] p = %Zd, dhA = %Zd, nonce = \n", prime, dhA_mpz);
-
-    // print nonce
-    for (int i = 0; i < DH_NONCE_SIZE; i++)
-    {
-        printf("%d ", n0[i]);
-    }
-    printf("\n");
 
     send(socket, payload, sizeof(payload), 0);
 }
@@ -113,10 +106,10 @@ static int is_server_response_sign_valid(
     if (strncmp((char *)server_public_key, (char *)public_key_file, public_key_len) != 0){
         perror("[CLIENT] Server public key does not match\n");
         // print out both for debugging
-        for(int i = 0; i < server_public_key_len; i++){
+        /* for(int i = 0; i < server_public_key_len; i++){
             printf("%c", server_public_key[i]);
         }
-        printf("\n");
+        printf("\n"); */
         free(server_public_key);
         return 0;
     }
@@ -266,12 +259,12 @@ gmp_randstate_t state,uint8_t* n0,uint8_t* n1)
     // gmp_printf("[SERVER] Received p = %Zd, dhA = %Zd, nonce = %d\n", prime, dhA_mpz, n0[0]);
 
     // print n0
-    printf("[SERVER] Received nonce: ");
+    /* printf("[SERVER] Received nonce: ");
     for (int i = 0; i < DH_NONCE_SIZE; i++)
     {
         printf("%d ", n0[i]);
     }
-    printf("\n");
+    printf("\n"); */
 }
 
 static void sign_data_to_client(
@@ -384,7 +377,7 @@ uint8_t * send_server_hello(int socket,
     printf("size of tag: %ld\n", sizeof(tag));
 
     size_t payload_len = DH_KEY_SIZE + DH_NONCE_SIZE + AES_TAG_SIZE + ciphertext_len;
-    uint8_t * server_payload = malloc(payload_len);
+    uint8_t * server_payload = malloc(payload_len + 10); // 10 just in case
 
     memcpy(server_payload, dhB_bytes, DH_KEY_SIZE);
     memcpy(server_payload + DH_KEY_SIZE, n1, DH_NONCE_SIZE);

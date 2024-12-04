@@ -51,7 +51,6 @@ void retrieve_data(int sockfd,gmp_randstate_t state, uint8_t * session_key /* As
     int len;
 
     response = receive_encypted_data(sockfd, &len, session_key);
-    printf("[CLIENT] Received: %s\n", response);
 
     if (len > 0) {
         response[len] = '\0';
@@ -97,8 +96,8 @@ int main(int argc, char** argv) {
     gmp_randseed_ui(state, time(NULL));
     uint8_t session_key[AES_KEY_SIZE];
     client_get_session_key(sockfd, session_key, state);
-    printf("[CLIENT] Session key: ");   
-    print_bytes(session_key, AES_KEY_SIZE);
+    /* printf("[CLIENT] Session key: ");   
+    print_bytes(session_key, AES_KEY_SIZE); */
 
 
     if (strcmp(argv[1], "--store") == 0) {
