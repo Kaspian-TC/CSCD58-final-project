@@ -232,7 +232,142 @@ gmp_randstate_t state,uint8_t* n0,uint8_t* n1)`
 
 - Processes receiving data, and unencrypt it using the session key provided
 
+<<<<<<< Updated upstream
 ### scripts
+=======
+### helper_func.c
+
+`void get_random_bytes(uint8_t *bytes, int length,gmp_randstate_t state)`
+
+- Generates an array of random bytes of the specified length using GMP's random state.
+
+`void initialize_values(const mpz_t prime, mpz_t dh, mpz_t secret, gmp_randstate_t state)`
+
+- Initializes values for a Diffie-Hellman key exchange:
+    - Generates a random secret value within the specified bit size (DH_NUM_BITS).
+    - Computes the Diffie-Hellman value (dh = g^secret mod prime), where g is a predefined generator (DH_G) and prime is the shared prime.
+
+`uint8_t *create_session_key(uint8_t *master_key, uint8_t *salt, uint8_t* session_key)`
+ 
+- Uses the HKDF (HMAC-based Key Derivation Function) algorithm to derive a session key:
+    - Configures HKDF with SHA256 as the hash function and a context-specific info string ("Session key").
+    - Generates the derived session key and stores it in session_key.
+
+`void create_salt(uint8_t *salt, uint8_t *n0, uint8_t *n1)`
+ 
+- Creates a salt for the HKDF key derivation by concatenating two nonces (n0 and n1) into the salt buffer.
+
+`void print_bytes(uint8_t *bytes, int length)`
+ 
+- Prints the contents of a byte array in decimal format for debugging or analysis purposes.
+
+`int aes_decrypt(uint8_t *ciphertext, int ciphertext_len,
+ uint8_t *aad, int aad_len,
+ uint8_t *tag,
+ uint8_t *key,
+ uint8_t *iv, int iv_len,
+ uint8_t *plaintext)`
+ 
+- Performs AES-GCM decryption:
+    - Decrypts ciphertext using the provided key and initialization vector (iv).
+    - Uses optional Additional Authenticated Data (aad) to enhance security.
+    - Validates the integrity of the ciphertext using the provided authentication tag (tag).
+
+`int aes_encrypt(uint8_t *plaintext, int plaintext_len,
+ uint8_t *aad, int aad_len,
+ uint8_t *key,
+ uint8_t *iv, int iv_len,
+ uint8_t *ciphertext,
+ uint8_t *tag)`
+ 
+- Performs AES-GCM encryption:
+    - Encrypts plaintext using the provided key and initialization vector (iv).
+    - Generates an authentication tag (tag) for integrity verification.
+    - Supports optional Additional Authenticated Data (aad).
+
+`int send_encypted_data(int socket, uint8_t *data, int data_len, uint8_t *session_key, gmp_randstate_t state)`
+ 
+- Encrypts the data using AES-GCM with the provided session_key and nonce, constructs a payload containing the nonce, authentication tag, and ciphertext and sends the payload over the provided socket.
+
+`uint8_t * receive_encypted_data(int socket, int * data_len, uint8_t *session_key)`
+ 
+- Receives and extracts the components from the payload. Decrypts data using AES-GCM with the provided session_key and return it.
+
+### server.c
+
+`void compute_hash(Block* block, const char* previous_hash, char* output_hash)`
+
+- Calculates a SHA-256 hash for a block by combining its data with the hash of the previous block. Produces the hash as a hexadecimal string for integrity verification.
+
+`void store_data(const char* payload)`
+
+- Creates a new block with the provided payload, computes its hash, links it to the blockchain, and validates the blockchain to ensure its integrity.
+
+`void retrieve_data(int client_sock, char* response, int* response_length)`
+ 
+- Prepares and sends a response containing all blocks in the blockchain, including their data, hashes, and previous hashes. Ensures the blockchain is validated before data retrieval and handles cases where no data exists.
+
+`int validate_blockchain()`
+ 
+- Checks the integrity of the entire blockchain by verifying that each block’s hash is accurate and matches its previous_hash field. Detects and reports tampering if any discrepancies are found.
+
+`void free_blockchain()`
+ 
+- Releases all memory allocated for blocks in the blockchain and resets the blockchain to an empty state to prevent memory leaks.
+
+`void handle_client(int client_sock,gmp_randstate_t state)`
+ 
+- Manages client communication, including secure session key negotiation, encrypted data reception, and request processing. Supports data storage in the blockchain and blockchain retrieval. Ensures all responses are encrypted for secure transmission.
+
+`int main()`
+ 
+- Initializes and runs the blockchain server. 
+- Configures the network socket, handles incoming client connections, and delegates request handling to handle_client. 
+- Ensures blockchain integrity is maintained throughout server operation. Cleans up resources on termination.
+
+### client.c
+
+`void generate_random_data(char* buffer, size_t length)`
+
+- Generates a random string with a prefix (RandomData_) and stores it in the provided buffer. The randomness is seeded using the current time
+
+`void store_data(int sockfd,gmp_randstate_t state, uint8_t * session_key /* Assumed AES_BYTES long */)`
+
+- Sends randomly generated data securely(encrypted) to the server, then wait for receiving and decrypts the server's response.
+
+`void retrieve_data(int sockfd,gmp_randstate_t state, uint8_t * session_key /* Assumed AES_BYTES long */)`
+ 
+- Requests all data stored on the server's blockchain and decrypts + prints the received data.
+
+`int main(int argc, char** argv)`
+ 
+- Acts as the entry point for the client application. 
+- Establishes a TCP connection with the server and negotiates a secure session key.
+- Manages client-server communication for storing or retrieving blockchain data.
+
+### router.c
+
+`void forward_to_server(const char* server_ip, const char* message, char* response,gmp_randstate_t state)`
+
+- Facilitates communication between the router and a specific server. 
+- Establishes a connection to the specified server, performs a secure session key exchange, forwards the client's encrypted message to the server, and retrieves the server's encrypted response. 
+- The response is decrypted and stored for further processing.
+
+`void handle_client(int client_sock,gmp_randstate_t state)`
+
+- Manages communication with a connected client and forwards their requests to the appropriate servers. Establishes a secure session with the client and processes their requests:
+- For RETRIEVE, queries all servers, aggregates their responses, and returns the consolidated result to the client.
+- For other messages, routes the request to one server based on a round-robin strategy and relays the server’s response back to the client. All communication is encrypted for security.
+
+`int main()`
+ 
+- Initializes and operates the router application as a TCP server that listens for incoming client connections, forwards their requests to servers, and handles secure communication. 
+Configures socket settings, uses a secure random state for key exchange, and delegates each client connection to handle_client for processing. 
+
+## Analysis and discussion
+
+## Concluding remarks
+>>>>>>> Stashed changes
 
 
 
