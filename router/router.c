@@ -8,8 +8,6 @@
 #include "../shared_functions/helper_func.h"
 #include "../shared_functions/key_exchange.h"
 
-#define NUM_SERVERS 3
-#define MAX_LINE 256
 
 const char* server_ips[NUM_SERVERS] = {"10.0.1.1", "10.0.2.1", "10.0.3.1"};
 int current_server = 0;

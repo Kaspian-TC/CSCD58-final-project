@@ -58,7 +58,7 @@ void send_client_hello(int socket,
      sizeof(payload));
     // gmp_printf("[CLIENT] p = %Zd, dhA = %Zd, nonce = \n", prime, dhA_mpz);
 
-    send(socket, payload, sizeof(payload), 0);
+    send(socket, payload, DH_KEY_SIZE + DH_KEY_SIZE + DH_NONCE_SIZE, 0);
 }
 
 static void get_public_key_file(
@@ -356,12 +356,12 @@ uint8_t * send_server_hello(int socket,
 
     // Concatenate signature and certificate
     size_t plaintext_len = signed_len + public_key_len;
-    uint8_t * plaintext = malloc(plaintext_len);
+    uint8_t * plaintext = malloc(plaintext_len+10);
     memcpy(plaintext, signature, signed_len);
     memcpy(plaintext + signed_len, public_key, public_key_len);
 
     uint8_t tag[AES_TAG_SIZE];
-    uint8_t *ciphertext = malloc(plaintext_len);
+    uint8_t *ciphertext = malloc(plaintext_len+10);
 
     int ciphertext_len = aes_encrypt(
         (uint8_t *)plaintext,
@@ -373,11 +373,13 @@ uint8_t * send_server_hello(int socket,
         DH_NONCE_SIZE,
         ciphertext,
         tag);
-
+    if(ciphertext_len != plaintext_len){
+        printf("plaintext is %d while ciphertext is %d\n",(int)plaintext_len,ciphertext_len);
+    }
     printf("size of tag: %ld\n", sizeof(tag));
 
     size_t payload_len = DH_KEY_SIZE + DH_NONCE_SIZE + AES_TAG_SIZE + ciphertext_len;
-    uint8_t * server_payload = malloc(payload_len + 10); // 10 just in case
+    uint8_t * server_payload = malloc(payload_len + 100); // 100 for padding
 
     memcpy(server_payload, dhB_bytes, DH_KEY_SIZE);
     memcpy(server_payload + DH_KEY_SIZE, n1, DH_NONCE_SIZE);

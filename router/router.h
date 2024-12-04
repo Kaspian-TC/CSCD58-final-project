@@ -1,7 +1,7 @@
 #include <gmp.h>
 /* Defines */
 #define SERVER_PORT 5432
-#define MAX_LINE 256
+#define MAX_LINE 1024
 #define NUM_SERVERS 3
 #define BUFFER_SIZE 1024
 
