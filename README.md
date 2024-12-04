@@ -77,9 +77,64 @@ typedef struct Block {
 
 ## How to run tests
 
-## Implementation details and documentation
+### Setup/Config
+
+Ideally, the .ova file will find its way, and this setup will not be required, but in the case that it does not, here is a guide on how to set up a mininet environment for running the tests:
+
+- Make sure to use a mininet image, so that we can run mininet.
+- Create a folder in the home directory of the vm called `mininet_project`. This will be where all files will be sent to
+- From the given repository, take the client, router, and server folder, and put them under `mininet_project`. Then take the folder just called `mininet` a move its contents into the root of `mininet_project`. 
+- The layout of the folder should now look like this:
+```
+.
+|-- client/
+|-- compile_all.sh
+|-- deploy_and_run.py
+|-- get_openssl.sh
+|-- router/
+|-- server/
+|-- shared_functions/
+|-- topology.py
+`-- topology.pyc
+```
+
+- This project uses two libraries, Openssl and LibGMP. Libgmp should already be included, but if not, you can run `sudo apt install libgmp-dev` to install it.
+- Openssl is a bit trickier. Due to some older versions of ubuntu LTS rolling back the latest supported version of Openssl, we need to get a newer version of Openssl. In the case where you have openssl 3.x.x already installed, you do not need to continue here
+    - In the root of `mininet_project`, run `./get_openssl.sh` with sudo permissions. This will remove the existing libssl-dev library, download a newer version (September 2024), build it, install it, then link the libraries.
+    - THIS WILL TAKE A LONG TIME. Please expect at least 10 minutes for it to finish building and installing.
+    - Check that you are on the correct version of Openssl by running `openssl version`. It should be 3.0.15
+
+### Running the tests
+
+
+- First start by setting the X11 magic cookie as the same for the root user (make sure you connect over ssh)
+- Navigate to `mininet_project` and compile and the necessariy code by running `./compile_all.sh`. Then to start the topology, run `sudo deploy_and_run.py`.
+    - For some unknown reason, this sometimes does not work. Some fixes have been
+        - Using python (no 3)
+        - Not running the command in ssh, instead running it in the (not recommended for next step)
+- In the mininet terminal, open xterm for h1,h2,h3,h4, and h5. h1 is meant for simulating the client, h2 is meant for simulating the "router" (a server which interacts directly with the client) and h3-h5 are distributed servers which provide data to the router.
+- In h2, run `cd router` then `make run` to start the router
+- In h3-h5, run `cd server` then `make run` to start the distributed servers.
+- In h1, run `cd router` then `make retrieve` to simulate retrieving the data from server.
+    - This should result in the server sending back a response showing that no data is being stored.
+- Run `make store` to store some data in the server (this will be randomly generated data)
+- Running `make retrieve` again will show that there is now data in the first server (h3)
+- Running `make store` subsequent times will store data in the h4 and h5 servers.
 
 ### Alternative execution
+
+- There is an alternative test mode, that was used for just talking between a client and server, but uses docker.
+- Switch to the aes branch in the repository (which should be bundled)
+- If you have docker and tmux installed, run `./launch_cli_ser.sh`
+    - This should make a split tmux window with the server running in the right pane and the client window in the left
+- Start the client by running `make run` in the left pane pane
+- Now you can communicate with the server. Everything sent to the server gets sent back with a timestamp, just like in A1.
+
+## Implementation details and documentation
+
+
+ 
+
 
 ### key_exchange.c
 
