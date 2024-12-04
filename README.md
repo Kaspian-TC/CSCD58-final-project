@@ -232,9 +232,7 @@ gmp_randstate_t state,uint8_t* n0,uint8_t* n1)`
 
 - Processes receiving data, and unencrypt it using the session key provided
 
-<<<<<<< Updated upstream
 ### scripts
-=======
 ### helper_func.c
 
 `void get_random_bytes(uint8_t *bytes, int length,gmp_randstate_t state)`
@@ -363,12 +361,6 @@ gmp_randstate_t state,uint8_t* n0,uint8_t* n1)`
  
 - Initializes and operates the router application as a TCP server that listens for incoming client connections, forwards their requests to servers, and handles secure communication. 
 Configures socket settings, uses a secure random state for key exchange, and delegates each client connection to handle_client for processing. 
-
-## Analysis and discussion
-
-## Concluding remarks
->>>>>>> Stashed changes
-
 
 
 ## Analysis and Discussion
