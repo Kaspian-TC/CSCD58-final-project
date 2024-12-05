@@ -90,8 +90,9 @@ void handle_client(int client_sock,gmp_randstate_t state) {
                 snprintf(formatted_server_response, sizeof(formatted_server_response),
                          "Server %d:\n%s\n", i + 1, server_response);
                 formatted_response_len = strlen(formatted_response);
-                strncat(formatted_response, formatted_server_response,
-                        sizeof(formatted_response) - formatted_response_len - 1);
+                memcpy(formatted_response + formatted_response_len, formatted_server_response,
+                       strlen(formatted_server_response));
+                formatted_response_len += strlen(formatted_server_response);
             }
             // send(client_sock, formatted_response, formatted_response_len, 0);
         } else {
