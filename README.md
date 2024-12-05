@@ -81,7 +81,7 @@ typedef struct Block {
         - Implemented the session key derivation process using HKDF to generate secure keys for encryption and decryption.
 - Ankit:
     - Distributed Server Implementation
-        - Router coordination into three storage servers
+        - Client, Router, and three storage servers
     - Blockchain Implementation
         - Block creation, hashing, and validation
     - Mininet Setup
