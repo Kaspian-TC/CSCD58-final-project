@@ -138,9 +138,16 @@ uint8_t * n0,
 uint8_t * n1,
 uint8_t * session_key /* Assume 32 bytes */){
     // wait to receive a response from the server
-    uint8_t client_payload[DH_KEY_SIZE + DH_NONCE_SIZE + AES_TAG_SIZE + 1024]; // 1024 is for padding
+    int client_payload_len = DH_KEY_SIZE + DH_NONCE_SIZE + AES_TAG_SIZE + 1024;
+    uint8_t client_payload[client_payload_len]; // 1024 is for padding
     int payload_len = recv(socket, client_payload, 
-     sizeof(client_payload), 0);
+     client_payload_len, 0);
+    
+    if (payload_len < DH_KEY_SIZE + DH_NONCE_SIZE + AES_TAG_SIZE) {
+        perror("Invalid payload size");
+        exit(1);
+    }
+
     printf("[CLIENT] Received payload from server of size %d\n", payload_len);
     uint8_t dhB_bytes[DH_KEY_SIZE];
     uint8_t tag[AES_TAG_SIZE];
@@ -230,9 +237,15 @@ void receive_client_hello(int socket, mpz_t prime, mpz_t dhA_mpz,
 gmp_randstate_t state,uint8_t* n0,uint8_t* n1)
 {
     // receive p, dhA, nonce from client
-    uint8_t client_payload[DH_NUM_BITS + DH_KEY_SIZE + DH_NONCE_SIZE];
+    int client_payload_len = DH_KEY_SIZE + DH_KEY_SIZE + DH_NONCE_SIZE;
+    uint8_t client_payload[client_payload_len];
     int payload_len = recv(socket, client_payload, 
-    sizeof(client_payload), 0);
+    client_payload_len, 0);
+
+    if (payload_len < DH_KEY_SIZE + DH_KEY_SIZE + DH_NONCE_SIZE) {
+        perror("Invalid payload size: receive client hello");
+        exit(1);
+    }
     printf("[SERVER] Received payload of size %d\n", payload_len);
 
     // payload is in the format p (bytes) + dhA (bytes) + nonce (bytes)
