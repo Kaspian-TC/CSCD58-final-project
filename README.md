@@ -67,13 +67,25 @@ typedef struct Block {
 
 - Kaspian:
     - Prime number generation
-        - Using using prime numbers with HKDF
-    - Certificate signing and checking 
+        - Developed the functionality for generating secure 2048-bit prime numbers using GMP for the Diffie-Hellman key exchange.
+    - Certificate implementation
+        - Implemented certificate signing and validation functionality using OpenSSL, ensuring secure authentication for the system.
+    - Integrated encryption into mininet setup
+        - Ensured that the encryption and decryption of data was working in the mininet setup
 - Jerry:
     - HKDF key generation
+        - Implemented the HKDF-based key derivation process to generate secure session keys from Diffie-Hellman exchange values.
     - AES encryption
+        - Developed AES-GCM encryption and decryption functions for secure data transmission.
+    - Session key derivation
+        - Implemented the session key derivation process using HKDF to generate secure keys for encryption and decryption.
 - Ankit:
-    - Distributed server setup
+    - Distributed Server Implementation
+        - Client, Router, and three storage servers
+    - Blockchain Implementation
+        - Block creation, hashing, and validation
+    - Mininet Setup
+        - Configured the Mininet topology, including the client, router, and server nodes
 
 ## How to run tests
 
