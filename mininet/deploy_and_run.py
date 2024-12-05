@@ -13,14 +13,16 @@ def deploy_and_run(net):
 
     # cd into the router directory
     net.get('h2').cmd('cd router/')
+ 
+    # Run make clean and make on the server directorie
+    net.get('h3').cmd('cd server/')
+    net.get('h3').cmd('make clean')
+    net.get('h3').cmd('make')
+    net.get('h3').cmd('cd ..')
 
-    # Deploy server binaries to h3, h4, 
-    
     # Start servers on h3, h4, h5
     for host in ['h3', 'h4', 'h5']:
         net.get(host).cmd('cd server/')
-        net.get(host).cmd('make clean')
-        net.get(host).cmd('make')
         net.get(host).cmd('./server &')
 
     print("Starting programs on Mininet hosts...")
@@ -39,12 +41,12 @@ def deploy_and_run(net):
     
     # Run client operations
     print("Running --store operation...")
-    client_output_store = net.get('h1').cmd('make store')
+    client_output_store = net.get('h1').cmd('./client --store 10.0.0.2')
     print(client_output_store)
 
     time.sleep(1)
     print("Running --retrieve operation...")
-    client_output_retrieve = net.get('h1').cmd('make retrieve')
+    client_output_retrieve = net.get('h1').cmd('./client --retrieve 10.0.0.2')
     print(client_output_retrieve) 
 
 if __name__ == '__main__':

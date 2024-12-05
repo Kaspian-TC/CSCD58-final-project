@@ -90,12 +90,13 @@ Ideally, the .ova file will find its way, and this setup will not be required, b
 |-- client/
 |-- compile_all.sh
 |-- deploy_and_run.py
+|-- deploy_topology.py
 |-- get_openssl.sh
 |-- router/
 |-- server/
 |-- shared_functions/
-|-- topology.py
-`-- topology.pyc
+`-- topology.py
+
 ```
 
 - This project uses two libraries, Openssl and LibGMP. Libgmp should already be included, but if not, you can run `sudo apt install libgmp-dev` to install it.
@@ -106,8 +107,14 @@ Ideally, the .ova file will find its way, and this setup will not be required, b
 
 ### Running the tests
 
+
+- There is a simple test which just shows the client side. Run `sudo python3 deploy_and_run.py`, to start the topology and start the router and servers.
+- The client will automatically send data to the distributed servers, and then will ask to retrieve that data from the servers.
+- In the mininet terminal, you can run h1 `./client --store 10.0.0.2` or `./client --retrieve 10.0.0.2`
+
+- A more detailed test is described below
 - First start by setting the X11 magic cookie as the same for the root user (make sure you connect over ssh)
-- Navigate to `mininet_project` and compile and the necessariy code by running `./compile_all.sh`. Then to start the topology, run `sudo deploy_and_run.py`.
+- Navigate to `mininet_project` and compile and the necessariy code by running `./compile_all.sh`. Then to start the topology, run `sudo python3 deploy_topology.py`.
     - For some unknown reason, this sometimes does not work. Some fixes have been
         - Using python (no 3)
         - Not running the command in ssh, instead running it in the (not recommended for next step)
