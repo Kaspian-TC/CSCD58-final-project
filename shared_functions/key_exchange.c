@@ -205,7 +205,21 @@ uint8_t * session_key /* Assume 32 bytes */){
     if (!is_server_response_sign_valid(n0,n1,dhA_bytes,dhB_bytes,signature, signature_len, server_public_key, server_public_key_len)){
         perror("[CLIENT] Server response is invalid\n");   
     }
-
+    // print out n0, n1, dhA, dhB, prime, master_key
+    printf("[CLIENT] n0: ");
+    print_bytes(n0, DH_NONCE_SIZE);
+    printf("[CLIENT] n1: ");
+    print_bytes(n1, DH_NONCE_SIZE);
+    printf("[CLIENT] dhA: ");
+    print_bytes(dhA_bytes, DH_KEY_SIZE);
+    printf("[CLIENT] dhB: ");
+    print_bytes(dhB_bytes, DH_KEY_SIZE);
+    printf("[CLIENT] prime: ");
+    gmp_printf("%Zd\n", prime);
+    printf("[CLIENT] master key: ");
+    gmp_printf("%Zd\n", master_key);
+    printf("[CLIENT] master key bytes: ");
+    print_bytes(master_key_bytes, DH_KEY_SIZE);
     // Clean up
     free(plaintext);
 
@@ -217,6 +231,7 @@ uint8_t * client_get_session_key(int socket, uint8_t * session_key /* assumed 25
 	mpz_t prime, dhA_mpz, a;
     mpz_init2(prime,DH_NUM_BITS);//make sure to call mpz_clear(); after using
     uint8_t master_key[DH_KEY_SIZE];
+    memset(master_key, 0, DH_KEY_SIZE);
     uint8_t n0[DH_NONCE_SIZE];
     uint8_t n1[DH_NONCE_SIZE];
     get_big_prime(prime,state);
@@ -226,6 +241,11 @@ uint8_t * client_get_session_key(int socket, uint8_t * session_key /* assumed 25
     receive_server_hello(socket,
      prime, dhA_mpz, a,state, master_key,n0,n1,session_key);
 	mpz_clears(prime,dhA_mpz,a,NULL);
+
+    // print the session key 
+    printf("[CLIENT] Session key: ");
+    print_bytes(session_key, AES_KEY_SIZE);
+
 
 	return session_key;
 }
@@ -402,6 +422,22 @@ uint8_t * send_server_hello(int socket,
     printf("[SERVER] Sending payload to client of size %ld\n", payload_len);
     send(socket, server_payload, payload_len , 0);
     
+    // print out n0, n1, dhA, dhB, prime, master_key
+    printf("[SERVER] n0: ");
+    print_bytes(n0, DH_NONCE_SIZE);
+    printf("[SERVER] n1: ");
+    print_bytes(n1, DH_NONCE_SIZE);
+    printf("[SERVER] dhA: ");
+    print_bytes(dhA_bytes, DH_KEY_SIZE);
+    printf("[SERVER] dhB: ");
+    print_bytes(dhB_bytes, DH_KEY_SIZE);
+    printf("[SERVER] prime: ");
+    gmp_printf("%Zd\n", prime);
+    printf("[SERVER] master key: ");
+    gmp_printf("%Zd\n", master_key);
+    printf("[SERVER] master key bytes: ");
+    print_bytes(master_key_bytes, DH_KEY_SIZE);
+
     mpz_clears(dhB_mpz,b,master_key,NULL);
     free(server_payload);
     free(public_key);
@@ -421,6 +457,10 @@ uint8_t * server_get_session_key(int socket,  uint8_t * session_key  /* assumed 
     receive_client_hello(socket, prime, dhA_mpz, state, n0,n1);
     send_server_hello(socket,prime,dhA_mpz,state,master_key,n0,n1,session_key);
     mpz_clears(prime,dhA_mpz,NULL);
+
+    // print the session key 
+    printf("[SERVER] Session key: ");
+    print_bytes(session_key, AES_KEY_SIZE);
 
     return session_key;
 }
