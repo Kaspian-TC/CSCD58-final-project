@@ -146,6 +146,10 @@ Ideally, the .ova file will find its way, and this setup will not be required, b
 
 - The script automates the deployment and execution of the project's binaries in a Mininet environment. It initializes a custom network topology, compiles and deploys the server, router, and client binaries to their respective Mininet hosts, and starts the necessary processes. The script performs client operations, including storing and retrieving data, to test the distributed blockchain system.
 
+`deploy_topology.py`
+
+- This script starts the mininet topology defined in toplogy.py.
+
 `get_openssl.sh`
 
 - The script automates the installation of the latest version of OpenSSL (3.0.15), updates the system's library links to ensure the newly installed version is used, providing compatibility with the project's cryptographic requirements.
