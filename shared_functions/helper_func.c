@@ -234,6 +234,12 @@ int send_encypted_data(int socket, uint8_t *data, int data_len, uint8_t *session
 uint8_t * receive_encypted_data(int socket, int * data_len, uint8_t *session_key){
     uint8_t payload[DH_NONCE_SIZE + AES_TAG_SIZE + 2048];
     int payload_len = recv(socket, payload, DH_NONCE_SIZE + AES_TAG_SIZE + 2048, 0);
+
+    if (payload_len <= DH_NONCE_SIZE + AES_TAG_SIZE) {
+        perror("Invalid payload size");
+        exit(1);
+    }
+
     printf("Received payload of size %d\n", payload_len);
     uint8_t nonce[DH_NONCE_SIZE];
     uint8_t tag[AES_TAG_SIZE];
