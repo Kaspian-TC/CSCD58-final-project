@@ -129,6 +129,25 @@ Ideally, the .ova file will find its way, and this setup will not be required, b
 - Start the client by running `make run` in the left pane pane
 - Now you can communicate with the server. Everything sent to the server gets sent back with a timestamp, just like in A1.
 
+### Scripts
+
+`compile_all.sh`
+
+- The script automates the compilation process for the project's client, router, and server components. This ensures that all components are built correctly and ready for execution.
+
+`deploy_and_run.py`
+
+- The script automates the deployment and execution of the project's binaries in a Mininet environment. It initializes a custom network topology, compiles and deploys the server, router, and client binaries to their respective Mininet hosts, and starts the necessary processes. The script performs client operations, including storing and retrieving data, to test the distributed blockchain system.
+
+`get_openssl.sh`
+
+- The script automates the installation of the latest version of OpenSSL (3.0.15), updates the system's library links to ensure the newly installed version is used, providing compatibility with the project's cryptographic requirements.
+
+`topology.py`
+
+- The topology.py script defines a custom network topology for the project using Mininet. It creates a simulated network with a client, a router, and three distributed servers, each on its own subnet.
+
+
 ## Implementation details and documentation
 
 ### key_exchange.c
@@ -235,7 +254,6 @@ gmp_randstate_t state,uint8_t* n0,uint8_t* n1)`
 - Produces a public key from a private key, without having to create a file for it. 
 - This is used when the server needs to send the certificate (their public key) to the client
 
-### scripts
 ### helper_func.c
 
 `void get_random_bytes(uint8_t *bytes, int length,gmp_randstate_t state)`
