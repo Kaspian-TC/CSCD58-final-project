@@ -274,8 +274,8 @@ uint8_t * receive_encypted_data(int socket, int * data_len, uint8_t *session_key
     int payload_len = recv(socket, payload, expected_payload_len, 0);
 
     if (payload_len < DH_NONCE_SIZE + AES_TAG_SIZE) {
-        perror("Invalid payload size");
-        exit(1);
+        *data_len = -1; // indicate error
+        return NULL;
     }
 
     // printf("Received payload of size %d\n", payload_len);
@@ -304,7 +304,8 @@ uint8_t * receive_encypted_data(int socket, int * data_len, uint8_t *session_key
     plaintext);
     if(plaintext_len < 0){
         perror("Plaintext decryption error");
-        exit(1);
+        *data_len = -1; // indicate error
+        return NULL;
     }
     
     // printf("Received plaintext of size %d\n", plaintext_len);
