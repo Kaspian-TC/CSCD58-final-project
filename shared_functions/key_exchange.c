@@ -147,7 +147,7 @@ uint8_t * session_key /* Assume 32 bytes */){
      client_payload_len, 0);
     
     if (payload_len < DH_KEY_SIZE + DH_NONCE_SIZE + AES_TAG_SIZE) {
-        perror("Invalid payload size");
+        perror("Invalid payload size: receive server hello");
         return 0;
     }
 
@@ -212,7 +212,7 @@ uint8_t * session_key /* Assume 32 bytes */){
         perror("[CLIENT] Server response is invalid\n");   
     }
     // print out n0, n1, dhA, dhB, prime, master_key
-    printf("[CLIENT] n0: ");
+    /* printf("[CLIENT] n0: ");
     print_bytes(n0, DH_NONCE_SIZE);
     printf("[CLIENT] n1: ");
     print_bytes(n1, DH_NONCE_SIZE);
@@ -223,7 +223,7 @@ uint8_t * session_key /* Assume 32 bytes */){
     printf("[CLIENT] prime: ");
     gmp_printf("%Zd\n", prime);
     printf("[CLIENT] master key bytes: ");
-    print_bytes(master_key_bytes, DH_KEY_SIZE);
+    print_bytes(master_key_bytes, DH_KEY_SIZE); */
     // Clean up
     free(plaintext);
 
@@ -241,7 +241,7 @@ uint8_t * client_get_session_key(int socket, uint8_t * session_key /* assumed 25
     get_big_prime(prime,state);
 
     initialize_values(prime, dhA_mpz, a, state);
-    gmp_printf("[CLIENT] original secret key a = %Zd\n", a);
+    // gmp_printf("[CLIENT] original secret key a = %Zd\n", a);
     send_client_hello(socket,prime, dhA_mpz, a,state,n0);
     receive_server_hello(socket,
      prime, dhA_mpz, a,state, master_key,n0,n1,session_key);
@@ -432,7 +432,7 @@ uint8_t * send_server_hello(int socket,
     send(socket, server_payload, payload_len , 0);
     
     // print out n0, n1, dhA, dhB, prime, master_key
-    printf("[SERVER] n0: ");
+    /* printf("[SERVER] n0: ");
     print_bytes(n0, DH_NONCE_SIZE);
     printf("[SERVER] n1: ");
     print_bytes(n1, DH_NONCE_SIZE);
@@ -443,7 +443,7 @@ uint8_t * send_server_hello(int socket,
     printf("[SERVER] prime: ");
     gmp_printf("%Zd\n", prime);
     printf("[SERVER] master key bytes: ");
-    print_bytes(master_key_bytes, DH_KEY_SIZE);
+    print_bytes(master_key_bytes, DH_KEY_SIZE); */
 
     mpz_clears(dhB_mpz,b,NULL);
     free(server_payload);

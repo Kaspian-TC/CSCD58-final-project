@@ -106,7 +106,6 @@ int main(int argc, char** argv) {
     gmp_randinit_mt(state);
     gmp_randseed_ui(state, time(NULL));
     uint8_t session_key[AES_KEY_SIZE];
-    client_get_session_key(sockfd, session_key, state);
 
     printf("[CLIENT] Performing key exchange with server...\n");
     client_get_session_key(sockfd, session_key, state);

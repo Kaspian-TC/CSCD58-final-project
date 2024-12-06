@@ -35,7 +35,7 @@ void initialize_values(const mpz_t prime, mpz_t dh, mpz_t secret,
     mpz_clear(g);
 
     // print out values
-    gmp_printf("[initialize_values] dh: %Zd\n", dh);
+    // gmp_printf("[initialize_values] dh: %Zd\n", dh);
     
 }
 
@@ -43,8 +43,8 @@ void get_master_key(mpz_t master_key,mpz_t dh, mpz_t secret, mpz_t prime, uint8_
     mpz_init(master_key);
     mpz_powm(master_key,dh,secret,prime); // m = dhA^b mod p
     // print out values to make master key
-    gmp_printf("[get_master_key] dh: %Zd\n", dh);
-    gmp_printf("[get_master_key] secret: %Zd\n", secret);
+    // gmp_printf("[get_master_key] dh: %Zd\n", dh);
+    // gmp_printf("[get_master_key] secret: %Zd\n", secret);
     // convert master key to bytes
     mpz_export(master_key_bytes, NULL, 1, 1, 1, 0, master_key);
 

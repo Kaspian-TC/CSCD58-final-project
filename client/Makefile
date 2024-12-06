@@ -12,6 +12,8 @@ retrieve: client
 	./client --retrieve 10.0.0.2
 store: client
 	./client --store 10.0.0.2
+session: client
+	./client --session 10.0.0.2	
 
 clean:
 	rm client
