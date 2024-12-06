@@ -50,8 +50,9 @@ void retrieve_data(int sockfd, uint8_t *session_key, gmp_randstate_t state) {
 }
 
 int main(int argc, char** argv) {
-    if (argc != 3) {
-        fprintf(stderr, "Usage: %s --store|--retrieve <router_host>\n", argv[0]);
+    // the usage shuold be ./client --session <router_host>
+    if (argc != 3 || strcmp(argv[1], "--session") != 0) {
+        fprintf(stderr, "Usage: %s --session <router_host>\n", argv[0]);
         return 1;
     }
 
@@ -90,15 +91,33 @@ int main(int argc, char** argv) {
     printf("[CLIENT] Key exchange completed: ");
     print_bytes(session_key, AES_KEY_SIZE);
 
-    if (strcmp(argv[1], "--store") == 0) {
-        store_data(sockfd, session_key, state);
-    } else if (strcmp(argv[1], "--retrieve") == 0) {
-        retrieve_data(sockfd, session_key, state);
-    } else {
-        fprintf(stderr, "Invalid operation: %s\n", argv[1]);
+    while (1) {
+        printf("[CLIENT] Enter command [store|retrieve|exit]: ");
+        fflush(stdout);
+
+        char command[MAX_LINE];
+        if (!fgets(command, sizeof(command), stdin)) {
+            break; // user ended input
+        }
+        command[strcspn(command, "\n")] = 0; // remove newline
+
+        if (strcmp(command, "store") == 0) {
+            store_data(sockfd, session_key, state);
+        } else if (strcmp(command, "retrieve") == 0) {
+            retrieve_data(sockfd, session_key, state);
+        } else if (strcmp(command, "exit") == 0) {
+            // Send "EXIT" to router to indicate end of session
+            send_encypted_data(sockfd, (uint8_t*)"EXIT", 4, session_key, state);
+            printf("[CLIENT] Exiting session.\n");
+            break;
+        } else {
+            printf("[CLIENT] Unknown command.\n");
+        }
     }
 
-    // gmp_randclear(state);
+    // Cleanup and close
     close(sockfd);
+    gmp_randclear(state);
     return 0;
+
 }
