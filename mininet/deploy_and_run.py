@@ -3,45 +3,56 @@ from mininet.node import Controller
 from mininet.cli import CLI
 from mininet.link import TCLink
 from topology import custom_topology
+import time 
 
 def deploy_and_run(net):
     print("Deploying binaries to Mininet hosts...")
 
-    # Deploy client binary to h1
-    net.get('h1').cmd('mkdir -p /tmp/project')
-    net.get('h1').cmd('cp /home/mininet/mininet_project/client/client /tmp/project/')
-    net.get('h1').cmd('chmod +x /tmp/project/client')
+    # cd into the client directory
+    net.get('h1').cmd('cd client/')
 
-    # Deploy router binary to h2
-    net.get('h2').cmd('mkdir -p /tmp/project')
-    net.get('h2').cmd('cp /home/mininet/mininet_project/router/router /tmp/project/')
-    net.get('h2').cmd('chmod +x /tmp/project/router')
+    # cd into the router directory
+    net.get('h2').cmd('cd router/')
+ 
+    # Run make clean and make on the server directorie
+    net.get('h3').cmd('cd server/')
+    net.get('h3').cmd('make clean')
+    net.get('h3').cmd('make')
+    net.get('h3').cmd('cd ..')
 
-    # Deploy server binaries to h3, h4, h5
+    # Start servers on h3, h4, h5
     for host in ['h3', 'h4', 'h5']:
-        net.get(host).cmd('mkdir -p /tmp/project')
-        net.get(host).cmd(f'cp /home/mininet/mininet_project/server/server /tmp/project/')
-        net.get(host).cmd('chmod +x /tmp/project/server')
+        net.get(host).cmd('cd server/')
+        net.get(host).cmd('./server &')
 
     print("Starting programs on Mininet hosts...")
 
     # Start router on h2
-    net.get('h2').cmd('/tmp/project/router &')
-
-    # Start servers on h3, h4, h5
-    for host in ['h3', 'h4', 'h5']:
-        net.get(host).cmd('/tmp/project/server &')
+    net.get('h2').cmd('make clean')
+    net.get('h2').cmd('make')
+    net.get('h2').cmd('./router > /tmp/router.log 2>&1 &')     
 
     print("Starting client operations...")
 
+    # remake the client binaries
+    net.get('h1').cmd('make clean')
+    net.get('h1').cmd('make')
+    time.sleep(1)
+    
     # Run client operations
     print("Running --store operation...")
-    client_output_store = net.get('h1').cmd('/tmp/project/client --store 10.0.0.2')
+    client_output_store = net.get('h1').cmd('./client --store 10.0.0.2')
     print(client_output_store)
 
+    time.sleep(1)
     print("Running --retrieve operation...")
-    client_output_retrieve = net.get('h1').cmd('/tmp/project/client --retrieve 10.0.0.2')
+    client_output_retrieve = net.get('h1').cmd('./client --retrieve 10.0.0.2')
     print(client_output_retrieve)
+
+    # Display router logs for debugging purposes
+    router_logs = net.get('h2').cmd('cat /tmp/router.log')
+    print("Router Logs:")
+    print(router_logs)
 
 if __name__ == '__main__':
     net = custom_topology()

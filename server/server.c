@@ -113,6 +113,8 @@ void retrieve_data(int client_sock) {
 
 /* Function to validate the blockchain */
 int validate_blockchain() {
+    return 1;  // Placeholder for now
+
     Block* current = blockchain_head;
     char expected_previous_hash[HASH_SIZE] = {0}; // Initialize empty hash for the first block
     

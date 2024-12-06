@@ -5,6 +5,8 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include "router.h"
+#include "../shared_functions/helper_func.h"
+#include "../shared_functions/key_exchange.h"
 
 #define NUM_SERVERS 3
 #define MAX_LINE 256
@@ -47,13 +49,21 @@ void forward_to_server(const char* server_ip, const char* message, char* respons
     close(sockfd);
 }
 
-void handle_client(int client_sock) {
+void handle_client(int client_sock, gmp_randstate_t state) {
+    uint8_t session_key[AES_KEY_SIZE] = {0};
+
+    server_get_session_key(client_sock, session_key, state);
+
+    printf("[ROUTER] Key exchange completed: ");
+    print_bytes(session_key, AES_KEY_SIZE);
+
     char buffer[MAX_LINE] = {0};
     int len = recv(client_sock, buffer, sizeof(buffer) - 1, 0);
 
     if (len > 0) {
         buffer[len] = '\0';
         printf("[ROUTER] Received: %s\n", buffer);
+        fflush(stdout);
 
         if (strcmp(buffer, "RETRIEVE") == 0) {
             char formatted_response[MAX_LINE * NUM_SERVERS] = {0};
@@ -69,6 +79,7 @@ void handle_client(int client_sock) {
                 strncat(formatted_response, formatted_server_response,
                         sizeof(formatted_response) - strlen(formatted_response) - 1);
             }
+            
             send(client_sock, formatted_response, strlen(formatted_response), 0);
         } else {
             char server_response[MAX_LINE] = {0};
@@ -83,6 +94,9 @@ void handle_client(int client_sock) {
 }
 
 int main() {
+    printf("[ROUTER] Starting server...\n");
+    fflush(stdout);
+
     int router_sock, client_sock;
     struct sockaddr_in router_addr, client_addr;
     socklen_t addr_len = sizeof(client_addr);
@@ -111,6 +125,11 @@ int main() {
     }
 
     printf("[ROUTER] Listening on port %d\n", SERVER_PORT);
+    fflush(stdout);
+
+    gmp_randstate_t state;
+    gmp_randinit_mt(state);
+    gmp_randseed_ui(state, time(NULL));
 
     while (1) {
         client_sock = accept(router_sock, (struct sockaddr*)&client_addr, &addr_len);
@@ -119,9 +138,10 @@ int main() {
             continue;
         }
 
-        handle_client(client_sock);
+        handle_client(client_sock, state);
     }
 
+    gmp_randclear(state);
     close(router_sock);
     return 0;
 }

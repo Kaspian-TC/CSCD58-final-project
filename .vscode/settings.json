@@ -3,6 +3,8 @@
     "in.h": "c",
     "stdio.h": "c",
     "array": "c",
-    "vector": "c"
+    "vector": "c",
+    "key_exchange.h": "c",
+    "helper_func.h": "c"
   }
 }

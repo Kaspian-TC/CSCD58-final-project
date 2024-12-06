@@ -1,9 +1,12 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <time.h>
+#include "../shared_functions/helper_func.h"
+#include "../shared_functions/key_exchange.h"
 
 #define MAX_LINE 256
 #define SERVER_PORT 5432
@@ -69,6 +72,18 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    gmp_randstate_t state;
+    gmp_randinit_mt(state);
+    gmp_randseed_ui(state, time(NULL));
+
+    uint8_t session_key[AES_KEY_SIZE] = {0};
+
+    printf("[CLIENT] Performing key exchange with server...\n");
+    client_get_session_key(sockfd, session_key, state);
+
+    printf("[CLIENT] Key exchange completed: ");
+    print_bytes(session_key, AES_KEY_SIZE);
+
     if (strcmp(argv[1], "--store") == 0) {
         store_data(sockfd);
     } else if (strcmp(argv[1], "--retrieve") == 0) {
@@ -77,6 +92,7 @@ int main(int argc, char** argv) {
         fprintf(stderr, "Invalid operation: %s\n", argv[1]);
     }
 
+    // gmp_randclear(state);
     close(sockfd);
     return 0;
 }
