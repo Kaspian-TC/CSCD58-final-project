@@ -3,7 +3,6 @@ from mininet.node import Controller
 from mininet.cli import CLI
 from mininet.link import TCLink
 from topology import custom_topology
-import time 
 
 def deploy_and_run(net):
     print("Deploying binaries to Mininet hosts...")
@@ -20,10 +19,10 @@ def deploy_and_run(net):
     net.get('h3').cmd('make')
     net.get('h3').cmd('cd ..')
 
-    # Start servers on h3, h4, h5
+    # Start servers on h3, h4, h5, and store their logs in /tmp
     for host in ['h3', 'h4', 'h5']:
         net.get(host).cmd('cd server/')
-        net.get(host).cmd('./server &')
+        net.get(host).cmd('./server > /tmp/server%s.log 2>&1 &' % (int(host[1])-2))
 
     print("Starting programs on Mininet hosts...")
 

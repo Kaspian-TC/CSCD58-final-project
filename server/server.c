@@ -85,9 +85,9 @@ void store_data(const char* payload) {
 }
 
 /* Function to retrieve all data in the blockchain */
-void retrieve_data(int client_sock, char* response, int* response_length) {
-    
-    const int max_response_length = MAX_LINE * 10;  // Adjust size as needed for large data
+void retrieve_data(int client_sock, uint8_t *session_key, gmp_randstate_t state) {
+    char response[MAX_LINE * 10] = {0};  // Adjust size as needed for large data
+
     // Validate blockchain before sending data
     if (!validate_blockchain()) {
         char fail_response[] = "Blockchain validation failed. Data retrieval aborted.\n";
@@ -111,7 +111,11 @@ void retrieve_data(int client_sock, char* response, int* response_length) {
         }
         printf("[SERVER] Sent blockchain data:\n%s\n", response);
     }
-    *response_length = strlen(response);
+
+    // send(client_sock, response, strlen(response), 0);
+    send_encypted_data(client_sock, (uint8_t*)response, strlen(response), session_key, state);
+
+    printf("[SERVER] Sent blockchain data:\n%s", response);
 }
 
 
@@ -158,43 +162,46 @@ void free_blockchain() {
     blockchain_head = NULL;
 }
 
-void handle_client(int client_sock,gmp_randstate_t state) {
-    // open session with client
-    uint8_t session_key[AES_KEY_SIZE];
+void handle_client(int client_sock) {
+    gmp_randstate_t state;
+    gmp_randinit_mt(state);
+    gmp_randseed_ui(state, time(NULL));
+
+    uint8_t session_key[AES_KEY_SIZE] = {0};
     server_get_session_key(client_sock, session_key, state);
-    // receive data from client
-    int len;
-    uint8_t* ubuffer = receive_encypted_data(client_sock, &len, session_key);
-    char buffer[MAX_LINE] = {0};
-    memcpy(buffer, ubuffer, len);
-    free(ubuffer);
-    // int len = recv(client_sock, buffer, sizeof(buffer) - 1, 0);
 
-    if (len > 0) {
-        buffer[len] = '\0';
-        printf("[SERVER] Received: %s\n", buffer);
+    printf("[SERVER] Key exchange completed with ROUTER\n");
+    fflush(stdout);
 
-        char response[MAX_LINE * 10] = {0};  // Adjust size as needed for large data
-        int response_length;
-        if (strcmp(buffer, "RETRIEVE") == 0) {
-            retrieve_data(client_sock, response,&response_length);
-            // send the data to the client
-            // send(client_sock, response, response_length, 0);
-        } else {
-            store_data(buffer);
-            const char* ack = "DATA_STORED";
-            response_length = strlen(ack);
-            memcpy(response, ack, response_length);
-            // send(client_sock, response, response_length, 0);
+    print_bytes(session_key, AES_KEY_SIZE);
+    fflush(stdout);
+
+    while (1) {
+        int len;
+        uint8_t* decrypted_data = receive_encypted_data(client_sock, &len, session_key);
+
+        if (len <= 0) {
+            free(decrypted_data);
+            printf("[SERVER] No data or connection closed, ending session.\n");
+            break;
         }
-        // send the data to the client
-        send_encypted_data(client_sock,
-         (uint8_t *)response,
-         response_length, session_key,state);
-    } else {
-        printf("[SERVER] No data received, closing connection.\n");
+
+        decrypted_data[len] = '\0';
+        printf("[SERVER] Received: %s\n", decrypted_data);
+
+        if (strcmp((char*)decrypted_data, "RETRIEVE") == 0) {
+            retrieve_data(client_sock, session_key, state);
+        } else {
+            // Assume any other message is data to store
+            store_data((char*)decrypted_data);
+            const char* ack = "DATA_STORED";
+            send_encypted_data(client_sock, (uint8_t*)ack, strlen(ack), session_key, state);
+        }
+
+        free(decrypted_data);
     }
 
+    gmp_randclear(state);
     close(client_sock);
 }
 

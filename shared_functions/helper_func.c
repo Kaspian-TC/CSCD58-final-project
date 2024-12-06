@@ -259,7 +259,7 @@ int send_encypted_data(int socket, uint8_t *data, int data_len, uint8_t *session
     memcpy(payload, nonce, DH_NONCE_SIZE);
     memcpy(payload + DH_NONCE_SIZE, tag, AES_TAG_SIZE);
     memcpy(payload + DH_NONCE_SIZE + AES_TAG_SIZE, ciphertext, ciphertext_len);
-    printf("Sending payload of size %d\n", payload_len);
+    // printf("Sending payload of size %d\n", payload_len);
     free(ciphertext);
     // send the payload
     send(socket, payload, payload_len, 0);
@@ -278,7 +278,7 @@ uint8_t * receive_encypted_data(int socket, int * data_len, uint8_t *session_key
         exit(1);
     }
 
-    printf("Received payload of size %d\n", payload_len);
+    // printf("Received payload of size %d\n", payload_len);
     uint8_t nonce[DH_NONCE_SIZE];
     uint8_t tag[AES_TAG_SIZE];
     long ciphertext_len = payload_len - DH_NONCE_SIZE - AES_TAG_SIZE;
@@ -307,7 +307,7 @@ uint8_t * receive_encypted_data(int socket, int * data_len, uint8_t *session_key
         exit(1);
     }
     
-    printf("Received plaintext of size %d\n", plaintext_len);
+    // printf("Received plaintext of size %d\n", plaintext_len);
     *data_len = plaintext_len; 
     return plaintext;
 }
