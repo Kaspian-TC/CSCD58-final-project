@@ -5,6 +5,9 @@
     "array": "c",
     "vector": "c",
     "key_exchange.h": "c",
-    "helper_func.h": "c"
+    "helper_func.h": "c",
+    "string.h": "c",
+    "locale": "c",
+    "string": "c"
   }
 }

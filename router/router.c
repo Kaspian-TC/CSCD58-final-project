@@ -3,7 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <pthread.h>
+#include <time.h>
 #include "router.h"
 #include "../shared_functions/helper_func.h"
 #include "../shared_functions/key_exchange.h"
@@ -14,48 +14,69 @@
 const char* server_ips[NUM_SERVERS] = {"10.0.1.1", "10.0.2.1", "10.0.3.1"};
 int current_server = 0;
 
-void forward_to_server(const char* server_ip, const char* message, char* response) {
-    int sockfd;
-    struct sockaddr_in server_addr;
-    char buffer[MAX_LINE] = {0};
+// Arrays to store server sockets and session keys after a single key exchange
+int server_sockets[NUM_SERVERS];
+uint8_t server_session_keys[NUM_SERVERS][AES_KEY_SIZE];
 
-    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        perror("[ROUTER] Socket creation failed");
-        strcpy(response, "ERROR");
-        return;
+void connect_and_key_exchange_with_servers(gmp_randstate_t state) {
+    for (int i = 0; i < NUM_SERVERS; i++) {
+        int sockfd;
+        struct sockaddr_in server_addr;
+        if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+            perror("[ROUTER] Socket creation failed for server");
+            exit(EXIT_FAILURE);
+        }
+
+        memset(&server_addr, 0, sizeof(server_addr));
+        server_addr.sin_family = AF_INET;
+        server_addr.sin_port = htons(SERVER_PORT);
+        if (inet_pton(AF_INET, server_ips[i], &server_addr.sin_addr) <= 0) {
+            perror("[ROUTER] Invalid server IP address");
+            close(sockfd);
+            exit(EXIT_FAILURE);
+        }
+
+        if (connect(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+            perror("[ROUTER] Connection to server failed");
+            close(sockfd);
+            exit(EXIT_FAILURE);
+        }
+
+        printf("[ROUTER] Performing key exchange with server %d at %s...\n", i+1, server_ips[i]);
+        client_get_session_key(sockfd, server_session_keys[i], state);
+        printf("[ROUTER] Key exchange with server %d completed. Session key: ", i+1);
+        print_bytes(server_session_keys[i], AES_KEY_SIZE);
+
+        server_sockets[i] = sockfd;
     }
+}
 
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(SERVER_PORT);
-    inet_pton(AF_INET, server_ip, &server_addr.sin_addr);
+void send_command_to_server(int server_index, const char* message, char* response, gmp_randstate_t state) {
+    int sockfd = server_sockets[server_index];
+    uint8_t* session_key = server_session_keys[server_index];
 
-    if (connect(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-        perror("[ROUTER] Connection to server failed");
-        close(sockfd);
-        strcpy(response, "ERROR");
-        return;
-    }
+    // Send encrypted data
+    send_encypted_data(sockfd, (uint8_t*)message, strlen(message), session_key, state);
 
-    send(sockfd, message, strlen(message), 0);
-    int len = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
+    // Receive encrypted response
+    int len;
+    uint8_t* ubuffer = receive_encypted_data(sockfd, &len, session_key);
     if (len > 0) {
-        buffer[len] = '\0';
-        strncpy(response, buffer, MAX_LINE - 1);
+        memcpy(response, ubuffer, len);
+        response[len] = '\0';
     } else {
         strcpy(response, "NO_RESPONSE");
     }
 
-    close(sockfd);
+    free(ubuffer);
 }
 
 void handle_client(int client_sock, gmp_randstate_t state) {
     uint8_t session_key[AES_KEY_SIZE] = {0};
 
-    // Perform the Diffie-Hellman key exchange once
+    // Perform the Diffie-Hellman key exchange once with the client
     server_get_session_key(client_sock, session_key, state);
-
-    printf("[ROUTER] Key exchange completed: ");
+    printf("[ROUTER] Key exchange completed with CLIENT: ");
     print_bytes(session_key, AES_KEY_SIZE);
 
     while (1) {
@@ -67,23 +88,21 @@ void handle_client(int client_sock, gmp_randstate_t state) {
         }
 
         decrypted_data[data_len] = '\0';
-        printf("[ROUTER] Decrypted data: %s\n", decrypted_data);
 
         if (strcmp((char*)decrypted_data, "EXIT") == 0) {
             free(decrypted_data);
-            printf("[ROUTER] Received EXIT. Closing session.\n");
-            break; 
-        }
-
-        if (strcmp((char*)decrypted_data, "RETRIEVE") == 0) {
+            printf("[ROUTER] Received EXIT from client. Keeping connection open.\n");
+            break;
+        } else if (strcmp((char*)decrypted_data, "RETRIEVE") == 0) {
             char formatted_response[MAX_LINE * NUM_SERVERS] = {0};
 
             for (int i = 0; i < NUM_SERVERS; i++) {
                 char server_response[MAX_LINE] = {0};
-                forward_to_server(server_ips[i], (char*)decrypted_data, server_response);
+                send_command_to_server(i, (char*)decrypted_data, server_response, state);
+
                 char formatted_server_response[MAX_LINE * 2];
                 snprintf(formatted_server_response, sizeof(formatted_server_response),
-                        "Server %d:\n%s\n", i + 1, server_response);
+                         "Server %d:\n%s\n", i + 1, server_response);
                 strncat(formatted_response, formatted_server_response,
                         sizeof(formatted_response) - strlen(formatted_response) - 1);
             }
@@ -92,8 +111,10 @@ void handle_client(int client_sock, gmp_randstate_t state) {
         } else {
             char server_response[MAX_LINE] = {0};
             const char* target_server_ip = server_ips[current_server];
+            int server_index = current_server;
             current_server = (current_server + 1) % NUM_SERVERS;
-            forward_to_server(target_server_ip, (char*)decrypted_data, server_response);
+
+            send_command_to_server(server_index, (char*)decrypted_data, server_response, state);
             send_encypted_data(client_sock, (uint8_t*)server_response, strlen(server_response), session_key, state);
         }
 
@@ -101,11 +122,10 @@ void handle_client(int client_sock, gmp_randstate_t state) {
     }
 
     close(client_sock);
-
 }
 
 int main() {
-    printf("[ROUTER] Starting server...\n");
+    printf("[ROUTER] Starting router...\n");
     fflush(stdout);
 
     int router_sock, client_sock;
@@ -142,13 +162,21 @@ int main() {
     gmp_randinit_mt(state);
     gmp_randseed_ui(state, time(NULL));
 
+    // Connect to all servers and perform key exchange once
+    connect_and_key_exchange_with_servers(state);
+
     while (1) {
+        printf("[ROUTER] Waiting for client connections...\n");
         client_sock = accept(router_sock, (struct sockaddr*)&client_addr, &addr_len);
         if (client_sock < 0) {
             perror("[ROUTER] Accept failed");
-            continue;
+            continue; // Keep listening for new connections
         }
 
+        printf("[ROUTER] Accepted connection from client\n");
+        fflush(stdout);
+
+        // Handle the client in a separate function
         handle_client(client_sock, state);
     }
 
