@@ -67,7 +67,7 @@ void send_command_to_server(int server_index, const char* message, char* respons
         response[len] = '\0';
     } else {
         printf("[ROUTER] No response from server %d\n", server_index + 1);
-        strcpy(response, "NO_RESPONSE");
+        strcpy(response, "Reached size limit for server response");
     }
 
     free(ubuffer);
@@ -98,10 +98,10 @@ void handle_client(int client_sock, gmp_randstate_t state) {
             printf("[ROUTER] Received EXIT from client. Keeping connection open.\n");
             break;
         } else if (strcmp((char*)decrypted_data, "RETRIEVE") == 0) {
-            char formatted_response[MAX_LINE * NUM_SERVERS] = {0};
+            char formatted_response[MAX_LINE * NUM_SERVERS * 100] = {0};
 
             for (int i = 0; i < NUM_SERVERS; i++) {
-                char server_response[MAX_LINE] = {0};
+                char server_response[MAX_LINE * 100] = {0};
                 send_command_to_server(i, (char*)decrypted_data, server_response, state);
 
                 char formatted_server_response[MAX_LINE * 2];
@@ -113,7 +113,7 @@ void handle_client(int client_sock, gmp_randstate_t state) {
 
             send_encypted_data(client_sock, (uint8_t*)formatted_response, strlen(formatted_response), session_key, state);
         } else {
-            char server_response[MAX_LINE] = {0};
+            char server_response[MAX_LINE * 100] = {0};
             const char* target_server_ip = server_ips[current_server];
             int server_index = current_server;
             current_server = (current_server + 1) % NUM_SERVERS;
