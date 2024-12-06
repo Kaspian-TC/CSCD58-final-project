@@ -61,10 +61,12 @@ void send_command_to_server(int server_index, const char* message, char* respons
     // Receive encrypted response
     int len;
     uint8_t* ubuffer = receive_encypted_data(sockfd, &len, session_key);
+
     if (len > 0) {
         memcpy(response, ubuffer, len);
         response[len] = '\0';
     } else {
+        printf("[ROUTER] No response from server %d\n", server_index + 1);
         strcpy(response, "NO_RESPONSE");
     }
 
@@ -82,7 +84,9 @@ void handle_client(int client_sock, gmp_randstate_t state) {
     while (1) {
         int data_len;
         uint8_t* decrypted_data = receive_encypted_data(client_sock, &data_len, session_key);
+
         if (data_len <= 0) {
+            printf("[ROUTER] No data or connection closed, ending session.\n");
             free(decrypted_data);
             break; // connection closed or error
         }

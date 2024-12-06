@@ -145,7 +145,7 @@ uint8_t * session_key /* Assume 32 bytes */){
     
     if (payload_len < DH_KEY_SIZE + DH_NONCE_SIZE + AES_TAG_SIZE) {
         perror("Invalid payload size");
-        exit(1);
+        return 0;
     }
 
     // printf("[CLIENT] Received payload from server of size %d\n", payload_len);
@@ -264,7 +264,7 @@ gmp_randstate_t state,uint8_t* n0,uint8_t* n1)
 
     if (payload_len < DH_KEY_SIZE + DH_KEY_SIZE + DH_NONCE_SIZE) {
         perror("Invalid payload size: receive client hello");
-        exit(1);
+        return 0;
     }
     // printf("[SERVER] Received payload of size %d\n", payload_len);
 

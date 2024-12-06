@@ -31,6 +31,16 @@ void store_data(int sockfd, uint8_t* session_key, gmp_randstate_t state) {
 
     int data_len;
     uint8_t* decrypted_response = receive_encypted_data(sockfd, &data_len, session_key);
+    
+    if (data_len == -1) {
+        fprintf(stderr, "[CLIENT] store_data(): Error receiving encrypted data, closing connection.\n");
+        if (decrypted_response) {
+            free(decrypted_response);
+        }
+        close(sockfd);
+        return;
+    }
+
     printf("[CLIENT] Received: %.*s\n", data_len, decrypted_response);
     free(decrypted_response);
 }
@@ -45,6 +55,16 @@ void retrieve_data(int sockfd, uint8_t *session_key, gmp_randstate_t state) {
     // Receive encrypted response and decrypt
     int data_len;
     uint8_t* decrypted_response = receive_encypted_data(sockfd, &data_len, session_key);
+
+    if (data_len == -1) {
+        fprintf(stderr, "[CLIENT] retrieve_data: Error receiving encrypted data, closing connection.\n");
+        if (decrypted_response) {
+            free(decrypted_response);
+        }
+        close(sockfd);
+        return;
+    }
+
     printf("[CLIENT] Received:\n%.*s\n", data_len, decrypted_response);
     free(decrypted_response);
 }
