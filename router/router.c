@@ -56,10 +56,10 @@ void forward_to_server(const char* server_ip, const char* message, char* respons
     close(sockfd);
 }
 
-void handle_client(int client_sock,gmp_randstate_t state) {
-    
-    uint8_t session_key[AES_KEY_SIZE]; 
-        
+void handle_client(int client_sock, gmp_randstate_t state) {
+    uint8_t session_key[AES_KEY_SIZE] = {0};
+
+    // Perform the Diffie-Hellman key exchange once
     server_get_session_key(client_sock, session_key, state);
     
     /* printf("[ROUTER] Session key: ");   
@@ -74,40 +74,50 @@ void handle_client(int client_sock,gmp_randstate_t state) {
     free(ubuffer);
     // len = recv(client_sock, buffer, sizeof(buffer) - 1, 0);
 
-    if (len > 0) {
-        buffer[len] = '\0';
-        printf("[ROUTER] Received: %s\n", buffer);
+    while (1) {
+        int data_len;
+        uint8_t* decrypted_data = receive_encypted_data(client_sock, &data_len, session_key);
+        if (data_len <= 0) {
+            free(decrypted_data);
+            break; // connection closed or error
+        }
 
-        char formatted_response[MAX_LINE * NUM_SERVERS] = {0};
-        int formatted_response_len = 0;
-        if (strcmp(buffer, "RETRIEVE") == 0) {
+        decrypted_data[data_len] = '\0';
+        printf("[ROUTER] Decrypted data: %s\n", decrypted_data);
+
+        if (strcmp((char*)decrypted_data, "EXIT") == 0) {
+            free(decrypted_data);
+            printf("[ROUTER] Received EXIT. Closing session.\n");
+            break; 
+        }
+
+        if (strcmp((char*)decrypted_data, "RETRIEVE") == 0) {
+            char formatted_response[MAX_LINE * NUM_SERVERS] = {0};
+
             for (int i = 0; i < NUM_SERVERS; i++) {
                 char server_response[MAX_LINE] = {0};
-                forward_to_server(server_ips[i], buffer, server_response,state);
-
-                // Format the response to include server information
+                forward_to_server(server_ips[i], (char*)decrypted_data, server_response);
                 char formatted_server_response[MAX_LINE * 2];
                 snprintf(formatted_server_response, sizeof(formatted_server_response),
-                         "Server %d:\n%s\n", i + 1, server_response);
-                formatted_response_len = strlen(formatted_response);
-                memcpy(formatted_response + formatted_response_len, formatted_server_response,
-                       strlen(formatted_server_response));
-                formatted_response_len += strlen(formatted_server_response);
+                        "Server %d:\n%s\n", i + 1, server_response);
+                strncat(formatted_response, formatted_server_response,
+                        sizeof(formatted_response) - strlen(formatted_response) - 1);
             }
-            // send(client_sock, formatted_response, formatted_response_len, 0);
+
+            send_encypted_data(client_sock, (uint8_t*)formatted_response, strlen(formatted_response), session_key, state);
         } else {
-            char * server_response = formatted_response;
+            char server_response[MAX_LINE] = {0};
             const char* target_server_ip = server_ips[current_server];
             current_server = (current_server + 1) % NUM_SERVERS;
-            forward_to_server(target_server_ip, buffer, server_response,state);
-            formatted_response_len = strlen(server_response);
-            // send(client_sock, server_response, strlen(server_response), 0);
+            forward_to_server(target_server_ip, (char*)decrypted_data, server_response);
+            send_encypted_data(client_sock, (uint8_t*)server_response, strlen(server_response), session_key, state);
         }
-        send_encypted_data(client_sock, (uint8_t *)formatted_response, formatted_response_len, session_key,state);
-        // send(client_sock, formatted_response, formatted_response_len, 0);
+
+        free(decrypted_data);
     }
 
     close(client_sock);
+
 }
 
 int main() {

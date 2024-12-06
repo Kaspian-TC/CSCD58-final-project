@@ -30,24 +30,15 @@ def deploy_and_run(net):
     # Start router on h2
     net.get('h2').cmd('make clean')
     net.get('h2').cmd('make')
-    net.get('h2').cmd('./router &')        
-
-    print("Starting client operations...")
+    net.get('h2').cmd('./router > /tmp/router.log 2>&1 &')     
 
     # remake the client binaries
     net.get('h1').cmd('make clean')
     net.get('h1').cmd('make')
-    time.sleep(1)
     
-    # Run client operations
-    print("Running --store operation...")
-    client_output_store = net.get('h1').cmd('./client --store 10.0.0.2')
-    print(client_output_store)
-
-    time.sleep(1)
-    print("Running --retrieve operation...")
-    client_output_retrieve = net.get('h1').cmd('./client --retrieve 10.0.0.2')
-    print(client_output_retrieve) 
+    # just print to run h1 ./client --session 10.0.0.2 to start the client
+    print("To start the program, run the following command:")
+    print("h1 ./client --session 10.0.0.2\n")
 
 if __name__ == '__main__':
     net = custom_topology()

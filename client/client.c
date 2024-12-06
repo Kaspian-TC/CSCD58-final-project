@@ -20,24 +20,31 @@ void store_data(int sockfd,gmp_randstate_t state, uint8_t * session_key /* Assum
     
 
     char buffer[MAX_LINE] = {0};
-    int buffer_length = sizeof(buffer);
-    generate_random_data(buffer, buffer_length);
+    generate_random_data(buffer, sizeof(buffer));
 
-    send_encypted_data(sockfd, (uint8_t *)buffer, buffer_length, session_key, state);
-    printf("[CLIENT] Sent: %d\n", buffer_length);
+    printf("[CLIENT] Sending encrypted data: %s\n", buffer);
+    send_encypted_data(sockfd, (uint8_t*)buffer, strlen(buffer), session_key, state);
+    //send(sockfd, buffer, strlen(buffer), 0);
+    printf("[CLIENT] Sent: %s\n", buffer);
 
-    /* send(sockfd, buffer, strlen(buffer), 0);
-    printf("[CLIENT] Sent: %s\n", buffer); */
+    // char response[MAX_LINE] = {0};
+    // recv(sockfd, response, sizeof(response), 0);
+    // printf("[CLIENT] Received: %s\n", response);
 
-    uint8_t * response;
-    int response_length;
+    int data_len;
+    uint8_t* decrypted_response = receive_encypted_data(sockfd, &data_len, session_key);
+    
+    if (data_len == -1) {
+        fprintf(stderr, "[CLIENT] store_data(): Error receiving encrypted data, closing connection.\n");
+        if (decrypted_response) {
+            free(decrypted_response);
+        }
+        close(sockfd);
+        return;
+    }
 
-    response = receive_encypted_data(sockfd, &response_length, session_key);
-    printf("[CLIENT] Received: %s\n", response);
-
-    /* recv(sockfd, response, sizeof(response), 0);
-    printf("[CLIENT] Received: %s\n", response); */
-    free(response);
+    printf("[CLIENT] Received: %.*s\n", data_len, decrypted_response);
+    free(decrypted_response);
 }
 
 void retrieve_data(int sockfd,gmp_randstate_t state, uint8_t * session_key /* Assumed AES_BYTES long */) {
@@ -47,23 +54,27 @@ void retrieve_data(int sockfd,gmp_randstate_t state, uint8_t * session_key /* As
     send_encypted_data(sockfd, (uint8_t *)buffer, buffer_length, session_key, state);
     printf("[CLIENT] Sent: %s\n", buffer);
 
-    uint8_t * response;
-    int len;
+    // Receive encrypted response and decrypt
+    int data_len;
+    uint8_t* decrypted_response = receive_encypted_data(sockfd, &data_len, session_key);
 
-    response = receive_encypted_data(sockfd, &len, session_key);
-
-    if (len > 0) {
-        response[len] = '\0';
-        printf("[CLIENT] Received:\n%s\n", response);
-    } else {
-        printf("[CLIENT] No data received.\n");
+    if (data_len == -1) {
+        fprintf(stderr, "[CLIENT] retrieve_data: Error receiving encrypted data, closing connection.\n");
+        if (decrypted_response) {
+            free(decrypted_response);
+        }
+        close(sockfd);
+        return;
     }
-    free(response);
+
+    printf("[CLIENT] Received:\n%.*s\n", data_len, decrypted_response);
+    free(decrypted_response);
 }
 
 int main(int argc, char** argv) {
-    if (argc != 3) {
-        fprintf(stderr, "Usage: %s --store|--retrieve <router_host>\n", argv[0]);
+    // the usage shuold be ./client --session <router_host>
+    if (argc != 3 || strcmp(argv[1], "--session") != 0) {
+        fprintf(stderr, "Usage: %s --session <router_host>\n", argv[0]);
         return 1;
     }
 
@@ -96,19 +107,40 @@ int main(int argc, char** argv) {
     gmp_randseed_ui(state, time(NULL));
     uint8_t session_key[AES_KEY_SIZE];
     client_get_session_key(sockfd, session_key, state);
-    /* printf("[CLIENT] Session key: ");   
-    print_bytes(session_key, AES_KEY_SIZE); */
 
+    printf("[CLIENT] Performing key exchange with server...\n");
+    client_get_session_key(sockfd, session_key, state);
 
-    if (strcmp(argv[1], "--store") == 0) {
-        store_data(sockfd, state,session_key);
-    } else if (strcmp(argv[1], "--retrieve") == 0) {
-        retrieve_data(sockfd,state,session_key);
-    } else {
-        fprintf(stderr, "Invalid operation: %s\n", argv[1]);
+    printf("[CLIENT] Key exchange completed: ");
+    print_bytes(session_key, AES_KEY_SIZE);
+
+    while (1) {
+        printf("[CLIENT] Enter command [store|retrieve|exit]: ");
+        fflush(stdout);
+
+        char command[MAX_LINE];
+        if (!fgets(command, sizeof(command), stdin)) {
+            break; // user ended input
+        }
+        command[strcspn(command, "\n")] = 0; // remove newline
+
+        if (strcmp(command, "store") == 0) {
+            store_data(sockfd, state,session_key);
+        } else if (strcmp(command, "retrieve") == 0) {
+            retrieve_data(sockfd,state, session_key);
+        } else if (strcmp(command, "exit") == 0) {
+            // Send "EXIT" to router to indicate end of session
+            send_encypted_data(sockfd, (uint8_t*)"EXIT", 4, session_key, state);
+            printf("[CLIENT] Exiting session.\n");
+            break;
+        } else {
+            printf("[CLIENT] Unknown command.\n");
+        }
     }
 
+    // Cleanup and close
     close(sockfd);
     gmp_randclear(state);
     return 0;
+
 }

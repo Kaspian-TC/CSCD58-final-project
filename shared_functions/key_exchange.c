@@ -106,7 +106,7 @@ static int is_server_response_sign_valid(
         server_public_key_file, &server_public_key,
          &server_public_key_len);
     // compare read in public key with the public key from the server
-    if (strncmp((char *)server_public_key, (char *)public_key_file, public_key_len) != 0){
+    if (memcmp((char *)server_public_key, (char *)public_key_file, public_key_len) != 0){
         perror("[CLIENT] Server public key does not match\n");
         // print out both for debugging
         /* for(int i = 0; i < server_public_key_len; i++){
@@ -196,7 +196,7 @@ uint8_t * session_key /* Assume 32 bytes */){
         (uint8_t *) n1,
         DH_NONCE_SIZE,
         plaintext);
-    plaintext_len = ciphertext_len;
+
     long signature_len = 256; // signature length is always 256
     uint8_t signature[signature_len];
     long server_public_key_len = plaintext_len - signature_len;
