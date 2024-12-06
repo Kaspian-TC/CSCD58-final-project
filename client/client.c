@@ -16,31 +16,37 @@ void generate_random_data(char* buffer, size_t length) {
     snprintf(buffer, length, "RandomData_%d", rand());
 }
 
-void store_data(int sockfd) {
+void store_data(int sockfd, uint8_t* session_key, gmp_randstate_t state) {
     char buffer[MAX_LINE] = {0};
     generate_random_data(buffer, sizeof(buffer));
-    send(sockfd, buffer, strlen(buffer), 0);
+
+    printf("[CLIENT] Sending encrypted data: %s\n", buffer);
+    send_encypted_data(sockfd, (uint8_t*)buffer, strlen(buffer), session_key, state);
+    //send(sockfd, buffer, strlen(buffer), 0);
     printf("[CLIENT] Sent: %s\n", buffer);
 
-    char response[MAX_LINE] = {0};
-    recv(sockfd, response, sizeof(response), 0);
-    printf("[CLIENT] Received: %s\n", response);
+    // char response[MAX_LINE] = {0};
+    // recv(sockfd, response, sizeof(response), 0);
+    // printf("[CLIENT] Received: %s\n", response);
+
+    int data_len;
+    uint8_t* decrypted_response = receive_encypted_data(sockfd, &data_len, session_key);
+    printf("[CLIENT] Received: %.*s\n", data_len, decrypted_response);
+    free(decrypted_response);
 }
 
-void retrieve_data(int sockfd) {
+void retrieve_data(int sockfd, uint8_t *session_key, gmp_randstate_t state) {
     char buffer[MAX_LINE] = "RETRIEVE";
-    send(sockfd, buffer, strlen(buffer), 0);
-    printf("[CLIENT] Sent: %s\n", buffer);
 
-    char response[MAX_LINE * 10] = {0};  // Adjust size as needed
-    int len = recv(sockfd, response, sizeof(response) - 1, 0);
+    // Encrypt the request before sending
+    send_encypted_data(sockfd, (uint8_t*)buffer, strlen(buffer), session_key, state);
+    printf("[CLIENT] Sent encrypted request.\n");
 
-    if (len > 0) {
-        response[len] = '\0';
-        printf("[CLIENT] Received:\n%s\n", response);
-    } else {
-        printf("[CLIENT] No data received.\n");
-    }
+    // Receive encrypted response and decrypt
+    int data_len;
+    uint8_t* decrypted_response = receive_encypted_data(sockfd, &data_len, session_key);
+    printf("[CLIENT] Received:\n%.*s\n", data_len, decrypted_response);
+    free(decrypted_response);
 }
 
 int main(int argc, char** argv) {
@@ -85,9 +91,9 @@ int main(int argc, char** argv) {
     print_bytes(session_key, AES_KEY_SIZE);
 
     if (strcmp(argv[1], "--store") == 0) {
-        store_data(sockfd);
+        store_data(sockfd, session_key, state);
     } else if (strcmp(argv[1], "--retrieve") == 0) {
-        retrieve_data(sockfd);
+        retrieve_data(sockfd, session_key, state);
     } else {
         fprintf(stderr, "Invalid operation: %s\n", argv[1]);
     }
