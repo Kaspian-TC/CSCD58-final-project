@@ -19,19 +19,55 @@ void get_random_bytes(uint8_t *bytes, int length,gmp_randstate_t state)
 void initialize_values(const mpz_t prime, mpz_t dh, mpz_t secret,
  gmp_randstate_t state){
     mpz_t g;
-    mpz_inits(secret,g,NULL);
+    mpz_inits(g,NULL);
+    mpz_init2(secret,DH_NUM_BITS);
     
     mpz_init2(dh,DH_NUM_BITS);
     
     // gmp_printf("Prime number: %Zd\n", prime);
 
     mpz_urandomb(secret, state, DH_NUM_BITS);
-    // compute dh = g^secret mod p
     // initialize g 
     mpz_set_ui(g,DH_G);
 
+    // compute dh = g^secret mod p
     mpz_powm(dh,g,secret,prime); // dhA = g^a mod p
     mpz_clear(g);
+
+    // print out values
+    gmp_printf("[initialize_values] dh: %Zd\n", dh);
+    
+}
+
+void get_master_key(mpz_t master_key,mpz_t dh, mpz_t secret, mpz_t prime, uint8_t *master_key_bytes){
+    mpz_init(master_key);
+    mpz_powm(master_key,dh,secret,prime); // m = dhA^b mod p
+    // print out values to make master key
+    gmp_printf("[get_master_key] dh: %Zd\n", dh);
+    gmp_printf("[get_master_key] secret: %Zd\n", secret);
+    // convert master key to bytes
+    mpz_export(master_key_bytes, NULL, 1, 1, 1, 0, master_key);
+
+}
+
+void generate_session_key(uint8_t *session_key /* assume 32 */, mpz_t dh, mpz_t secret, mpz_t prime, gmp_randstate_t state, uint8_t *master_key_bytes, uint8_t *n0, uint8_t *n1)
+{
+    mpz_t master_key;
+    /* mpz_init(master_key);
+    mpz_powm(master_key,dh,secret,prime); // m = dhA^b mod p
+    // convert master key to bytes
+    mpz_export(master_key_bytes, NULL, 1, 1, 1, 0, master_key); */
+    get_master_key(master_key,dh,secret,prime,master_key_bytes);
+
+    // get the session key for aes
+    uint8_t salt[DH_NONCE_SIZE*2];
+    create_salt(salt,n0,n1);
+    
+    create_session_key(
+        master_key_bytes, 
+        salt,
+        session_key);
+    mpz_clear(master_key);
 }
 
 // create the session key using HKDF 

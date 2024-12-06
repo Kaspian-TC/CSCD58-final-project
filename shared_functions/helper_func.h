@@ -32,3 +32,5 @@ int aes_decrypt(uint8_t *ciphertext, int ciphertext_len,
     uint8_t *plaintext);
 int send_encypted_data(int socket, uint8_t *data, int data_len, uint8_t *session_key, gmp_randstate_t state);
 uint8_t * receive_encypted_data(int socket, int * data_len, uint8_t *session_key);
+
+void generate_session_key(uint8_t *session_key /* assume 32 */, mpz_t dh, mpz_t secret, mpz_t prime, gmp_randstate_t state, uint8_t *master_key_bytes, uint8_t *n0, uint8_t *n1);

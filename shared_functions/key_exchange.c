@@ -22,6 +22,8 @@ void get_big_prime(mpz_t prime, gmp_randstate_t state)
     mpz_nextprime(prime, random_number);
     
     mpz_clear(random_number);
+
+    // determine if 
     
 }
 
@@ -48,6 +50,7 @@ void send_client_hello(int socket,
 
     // send p, dhA, nonce to server
     // payload = p (bytes) + dhA (bytes) + nonce (bytes)
+    int payload_size = DH_KEY_SIZE + DH_KEY_SIZE + DH_NONCE_SIZE;
     uint8_t payload[DH_KEY_SIZE + DH_KEY_SIZE + DH_NONCE_SIZE];
     memcpy(payload, prime_bytes, DH_KEY_SIZE);
     memcpy(payload + DH_KEY_SIZE, dhA_bytes, DH_KEY_SIZE);
@@ -58,7 +61,7 @@ void send_client_hello(int socket,
      sizeof(payload));
     // gmp_printf("[CLIENT] p = %Zd, dhA = %Zd, nonce = \n", prime, dhA_mpz);
 
-    send(socket, payload, DH_KEY_SIZE + DH_KEY_SIZE + DH_NONCE_SIZE, 0);
+    send(socket, payload, payload_size, 0);
 }
 
 static void get_public_key_file(
@@ -162,12 +165,15 @@ uint8_t * session_key /* Assume 32 bytes */){
     //compute session key
     mpz_t dhB_mpz;
     mpz_init2(dhB_mpz,DH_NUM_BITS);
-    mpz_import(dhB_mpz, DH_KEY_SIZE, 1, 1, 1, 0, dhB_bytes);
+    // mpz_init(dhB_mpz); // regular init makes sure that empty bytes aren't used
+    mpz_import(dhB_mpz, DH_KEY_SIZE, 1, 1, 1, 0, dhB_bytes);    
 
-    // gmp_printf("[CLIENT] Received dhB = %Zd\n", dhB_mpz);
+    generate_session_key(session_key, dhB_mpz, a, prime, state, master_key_bytes, n0, n1);
+    mpz_clear(dhB_mpz);
 
-    mpz_t master_key;
-    mpz_init2(master_key, DH_NUM_BITS);
+    /* mpz_t master_key;
+    // mpz_init2(master_key, DH_NUM_BITS);
+    mpz_init(master_key);
     mpz_powm(master_key,dhB_mpz,a,prime); // m = dhB^a mod p
     // gmp_printf("[CLIENT] master = %Zd\n", master_key);
 	// convert master key to bytes
@@ -177,7 +183,7 @@ uint8_t * session_key /* Assume 32 bytes */){
     uint8_t salt[DH_NONCE_SIZE*2];
     create_salt(salt,n0,n1);
     
-    create_session_key(master_key_bytes, salt,session_key);
+    create_session_key(master_key_bytes, salt,session_key); */
 
     // decrypt the ciphertext and extract the signature, public key
     uint8_t *plaintext = malloc(ciphertext_len);
@@ -216,8 +222,6 @@ uint8_t * session_key /* Assume 32 bytes */){
     print_bytes(dhB_bytes, DH_KEY_SIZE);
     printf("[CLIENT] prime: ");
     gmp_printf("%Zd\n", prime);
-    printf("[CLIENT] master key: ");
-    gmp_printf("%Zd\n", master_key);
     printf("[CLIENT] master key bytes: ");
     print_bytes(master_key_bytes, DH_KEY_SIZE);
     // Clean up
@@ -231,12 +235,13 @@ uint8_t * client_get_session_key(int socket, uint8_t * session_key /* assumed 25
 	mpz_t prime, dhA_mpz, a;
     mpz_init2(prime,DH_NUM_BITS);//make sure to call mpz_clear(); after using
     uint8_t master_key[DH_KEY_SIZE];
-    memset(master_key, 0, DH_KEY_SIZE);
+    // memset(master_key, 0, DH_KEY_SIZE);
     uint8_t n0[DH_NONCE_SIZE];
     uint8_t n1[DH_NONCE_SIZE];
     get_big_prime(prime,state);
 
     initialize_values(prime, dhA_mpz, a, state);
+    gmp_printf("[CLIENT] original secret key a = %Zd\n", a);
     send_client_hello(socket,prime, dhA_mpz, a,state,n0);
     receive_server_hello(socket,
      prime, dhA_mpz, a,state, master_key,n0,n1,session_key);
@@ -332,14 +337,6 @@ uint8_t * send_server_hello(int socket,
     mpz_t b, g, dhB_mpz;
     initialize_values(prime,dhB_mpz,b,state);
     
-    mpz_t master_key;
-    mpz_init(master_key);
-    mpz_powm(master_key,dhA_mpz,b,prime); // m = dhA^b mod p
-    // convert master key to bytes
-    mpz_export(master_key_bytes, NULL, 1, 1, 1, 0, master_key);
-
-
-    // gmp_printf("[SERVER] Calculated dhB = %Zd, master key = %Zd\n", dhB_mpz, master_key);
     // convert dhB to string of bytes
     uint8_t dhB_bytes[DH_KEY_SIZE];
     mpz_export(dhB_bytes, NULL, 1, 1, 1, 0, dhB_mpz);
@@ -347,14 +344,26 @@ uint8_t * send_server_hello(int socket,
     // get n1 nonce
     get_random_bytes(n1, DH_NONCE_SIZE, state);
 
+    generate_session_key(session_key, dhA_mpz, b, prime, state, master_key_bytes, n0, n1);
+
+   /*  mpz_t master_key;
+    mpz_init(master_key);
+    mpz_powm(master_key,dhA_mpz,b,prime); // m = dhA^b mod p
+    // convert master key to bytes
+    mpz_export(master_key_bytes, NULL, 1, 1, 1, 0, master_key);
+
+
+    // gmp_printf("[SERVER] Calculated dhB = %Zd, master key = %Zd\n", dhB_mpz, master_key);
+    
+
     // get the session key for aes
     uint8_t salt[DH_NONCE_SIZE*2];
     create_salt(salt,n0,n1);
     
     create_session_key(
-        (uint8_t *) master_key_bytes, 
-        (uint8_t *)salt,
-        (uint8_t *)session_key);
+        master_key_bytes, 
+        salt,
+        session_key); */
 
     // convert dhA to string of bytes
     uint8_t dhA_bytes[DH_KEY_SIZE];
@@ -433,12 +442,10 @@ uint8_t * send_server_hello(int socket,
     print_bytes(dhB_bytes, DH_KEY_SIZE);
     printf("[SERVER] prime: ");
     gmp_printf("%Zd\n", prime);
-    printf("[SERVER] master key: ");
-    gmp_printf("%Zd\n", master_key);
     printf("[SERVER] master key bytes: ");
     print_bytes(master_key_bytes, DH_KEY_SIZE);
 
-    mpz_clears(dhB_mpz,b,master_key,NULL);
+    mpz_clears(dhB_mpz,b,NULL);
     free(server_payload);
     free(public_key);
     free(signature);
