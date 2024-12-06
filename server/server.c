@@ -86,7 +86,7 @@ void store_data(const char* payload) {
 
 /* Function to retrieve all data in the blockchain */
 void retrieve_data(int client_sock, uint8_t *session_key, gmp_randstate_t state) {
-    char response[MAX_LINE * 10] = {0};  // Adjust size as needed for large data
+    char response[MAX_LINE * 100] = {0};  // Adjust size as needed for large data
 
     // Validate blockchain before sending data
     if (!validate_blockchain()) {
