@@ -269,7 +269,7 @@ gmp_randstate_t state,uint8_t* n0,uint8_t* n1)
 
     if (payload_len < DH_KEY_SIZE + DH_KEY_SIZE + DH_NONCE_SIZE) {
         perror("Invalid payload size: receive client hello");
-        return 0;
+        return;
     }
     // printf("[SERVER] Received payload of size %d\n", payload_len);
 

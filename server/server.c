@@ -86,6 +86,7 @@ void store_data(const char* payload) {
 
 /* Function to retrieve all data in the blockchain */
 void retrieve_data(int client_sock, uint8_t *session_key, gmp_randstate_t state) {
+    int max_response_length = MAX_LINE * 100;
     char response[MAX_LINE * 100] = {0};  // Adjust size as needed for large data
 
     // Validate blockchain before sending data
@@ -162,10 +163,7 @@ void free_blockchain() {
     blockchain_head = NULL;
 }
 
-void handle_client(int client_sock) {
-    gmp_randstate_t state;
-    gmp_randinit_mt(state);
-    gmp_randseed_ui(state, time(NULL));
+void handle_client(int client_sock, gmp_randstate_t state) {
 
     uint8_t session_key[AES_KEY_SIZE] = {0};
     server_get_session_key(client_sock, session_key, state);
@@ -201,7 +199,7 @@ void handle_client(int client_sock) {
         free(decrypted_data);
     }
 
-    gmp_randclear(state);
+
     close(client_sock);
 }
 
@@ -251,6 +249,7 @@ int main() {
         handle_client(client_sock,state);
     }
 
+    gmp_randclear(state);
     free_blockchain();  // Clean up memory
     close(server_sock);
     return 0;
