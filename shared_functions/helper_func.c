@@ -23,8 +23,6 @@ void initialize_values(const mpz_t prime, mpz_t dh, mpz_t secret,
     mpz_init2(secret,DH_NUM_BITS);
     
     mpz_init2(dh,DH_NUM_BITS);
-    
-    // gmp_printf("Prime number: %Zd\n", prime);
 
     mpz_urandomb(secret, state, DH_NUM_BITS);
     // initialize g 
@@ -33,18 +31,12 @@ void initialize_values(const mpz_t prime, mpz_t dh, mpz_t secret,
     // compute dh = g^secret mod p
     mpz_powm(dh,g,secret,prime); // dhA = g^a mod p
     mpz_clear(g);
-
-    // print out values
-    // gmp_printf("[initialize_values] dh: %Zd\n", dh);
     
 }
 
 void get_master_key(mpz_t master_key,mpz_t dh, mpz_t secret, mpz_t prime, uint8_t *master_key_bytes){
     mpz_init(master_key);
     mpz_powm(master_key,dh,secret,prime); // m = dhA^b mod p
-    // print out values to make master key
-    // gmp_printf("[get_master_key] dh: %Zd\n", dh);
-    // gmp_printf("[get_master_key] secret: %Zd\n", secret);
     // convert master key to bytes
     mpz_export(master_key_bytes, NULL, 1, 1, 1, 0, master_key);
 
@@ -53,10 +45,6 @@ void get_master_key(mpz_t master_key,mpz_t dh, mpz_t secret, mpz_t prime, uint8_
 void generate_session_key(uint8_t *session_key /* assume 32 */, mpz_t dh, mpz_t secret, mpz_t prime, gmp_randstate_t state, uint8_t *master_key_bytes, uint8_t *n0, uint8_t *n1)
 {
     mpz_t master_key;
-    /* mpz_init(master_key);
-    mpz_powm(master_key,dh,secret,prime); // m = dhA^b mod p
-    // convert master key to bytes
-    mpz_export(master_key_bytes, NULL, 1, 1, 1, 0, master_key); */
     get_master_key(master_key,dh,secret,prime,master_key_bytes);
 
     // get the session key for aes
@@ -259,7 +247,6 @@ int send_encypted_data(int socket, uint8_t *data, int data_len, uint8_t *session
     memcpy(payload, nonce, DH_NONCE_SIZE);
     memcpy(payload + DH_NONCE_SIZE, tag, AES_TAG_SIZE);
     memcpy(payload + DH_NONCE_SIZE + AES_TAG_SIZE, ciphertext, ciphertext_len);
-    // printf("Sending payload of size %d\n", payload_len);
     free(ciphertext);
     // send the payload
     send(socket, payload, payload_len, 0);
@@ -277,8 +264,6 @@ uint8_t * receive_encypted_data(int socket, int * data_len, uint8_t *session_key
         *data_len = -1; // indicate error
         return NULL;
     }
-
-    // printf("Received payload of size %d\n", payload_len);
     uint8_t nonce[DH_NONCE_SIZE];
     uint8_t tag[AES_TAG_SIZE];
     long ciphertext_len = payload_len - DH_NONCE_SIZE - AES_TAG_SIZE;
@@ -307,8 +292,6 @@ uint8_t * receive_encypted_data(int socket, int * data_len, uint8_t *session_key
         *data_len = -1; // indicate error
         return NULL;
     }
-    
-    // printf("Received plaintext of size %d\n", plaintext_len);
     *data_len = plaintext_len; 
     return plaintext;
 }

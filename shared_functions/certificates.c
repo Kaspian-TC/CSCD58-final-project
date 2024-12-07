@@ -35,7 +35,6 @@ int sign_data(const char *private_key_path /* string */,const  uint8_t *data, lo
     // Assigns value to signature
     *signature = malloc(*signed_len + 8); // 8 bytes for padding
     EVP_DigestSignFinal(digest_context, (uint8_t*) *signature, signed_len);
-    printf("Signature created successfully\n");
     
     // Clean up
     EVP_MD_CTX_free(digest_context);
