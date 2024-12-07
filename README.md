@@ -121,23 +121,21 @@ Ideally, the .ova file will find its way, and this setup will not be required, b
 
 
 - There is a simple test which just shows the client side. Run `sudo python3 deploy_and_run.py`, to start the topology and start the router and servers.
-- The client will automatically send data to the distributed servers, and then will ask to retrieve that data from the servers.
-- In the mininet terminal, you can run h1 `./client --store 10.0.0.2` or `./client --retrieve 10.0.0.2`
+- Then run `h1 ./client --session 10.0.0.2` which will connect the client to the server. Then it will prompt to store data by typing store, or retrieving data stored in the distributed servers, by typing retrieve.
+- To exit, run exit
 
 - A more detailed test is described below
 - First start by setting the X11 magic cookie as the same for the root user (make sure you connect over ssh)
-- Navigate to `mininet_project` and compile and the necessariy code by running `./compile_all.sh`. Then to start the topology, run `sudo python3 deploy_topology.py`.
+- Navigate to `mininet_project`. To start the topology, run `sudo python3 deploy_topology.py`.
     - For some unknown reason, this sometimes does not work. Some fixes have been
         - Using python (no 3)
         - Not running the command in ssh, instead running it in the (not recommended for next step)
 - In the mininet terminal, open xterm for h1,h2,h3,h4, and h5. h1 is meant for simulating the client, h2 is meant for simulating the "router" (a server which interacts directly with the client) and h3-h5 are distributed servers which provide data to the router.
-- In h2, run `cd router` then `make run` to start the router
 - In h3-h5, run `cd server` then `make run` to start the distributed servers.
-- In h1, run `cd router` then `make retrieve` to simulate retrieving the data from server.
-    - This should result in the server sending back a response showing that no data is being stored.
-- Run `make store` to store some data in the server (this will be randomly generated data)
-- Running `make retrieve` again will show that there is now data in the first server (h3)
-- Running `make store` subsequent times will store data in the h4 and h5 servers.
+- In h2, run `cd router` then `make run` to start the router, and set up the connection with the distributed servers
+- In h1, run `cd client` then `make session` to start the session between the server and client.
+- You can now type store, retrieve, and exit like before, but now you can see what is happening on the server side as well
+
 
 ### Alternative execution
 
