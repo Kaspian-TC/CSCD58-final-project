@@ -142,6 +142,7 @@ Ideally, the .ova file will find its way, and this setup will not be required, b
 ### Alternative execution
 
 - There is an alternative test mode, that was used for just talking between a client and server, but uses docker.
+- This code is much older, and should not be viewed as the main project
 - Switch to the aes branch in the repository (which should be bundled)
 - If you have docker and tmux installed, run `./launch_cli_ser.sh`
     - This should make a split tmux window with the server running in the right pane and the client window in the left
