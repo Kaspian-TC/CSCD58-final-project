@@ -121,13 +121,17 @@ Ideally, the .ova file will find its way, and this setup will not be required, b
 
 ### Running the tests
 
-
-- There is a simple test which just shows the client side. Run `sudo python3 deploy_and_run.py`, to start the topology and start the router and servers.
+- There is a simple test which just shows the client side. Navigate to mininet_project in the home directory and run `sudo python3 deploy_and_run.py`, to start the topology and start the router and servers.
 - Then run `h1 ./client --session 10.0.0.2` which will connect the client to the server. Then it will prompt to store data by typing store, or retrieving data stored in the distributed servers, by typing retrieve.
 - To exit, run exit
 
+
 - A more detailed test is described below
-- First start by setting the X11 magic cookie as the same for the root user (make sure you connect over ssh)
+- First start by setting the X11 magic cookie as the same for the root user (make sure you connect using `ssh -Y`)
+    - To do this start by running `xauth list $DISPLAY`, and copying that value.
+    - Run `sudo -s` to get into root
+    - Run `xauth add` followed by what you copied earlier.
+    - Exit root by running `exit`
 - Navigate to `mininet_project`. To start the topology, run `sudo python3 deploy_topology.py`.
     - For some unknown reason, this sometimes does not work. Some fixes have been
         - Using python (no 3)
