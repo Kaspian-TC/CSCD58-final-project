@@ -387,22 +387,29 @@ gmp_randstate_t state,uint8_t* n0,uint8_t* n1)`
 
 ### router.c
 
-`void forward_to_server(const char* server_ip, const char* message, char* response,gmp_randstate_t state)`
+`void connect_and_key_exchange_with_servers(gmp_randstate_t state)`
 
-- Facilitates communication between the router and a specific server. 
-- Establishes a connection to the specified server, performs a secure session key exchange, forwards the client's encrypted message to the server, and retrieves the server's encrypted response. 
-- The response is decrypted and stored for further processing.
+- Connects to all three distributed servers at predefined IP addresses.
+- Uses Diffie-Hellman Key Exchange to generate a shared session key for secure communication with each server.
+- Prints the session key for each server.
 
-`void handle_client(int client_sock,gmp_randstate_t state)`
+`void send_command_to_server(int server_index, const char* message, char* response, gmp_randstate_t state)`
 
-- Manages communication with a connected client and forwards their requests to the appropriate servers. Establishes a secure session with the client and processes their requests:
-- For RETRIEVE, queries all servers, aggregates their responses, and returns the consolidated result to the client.
-- For other messages, routes the request to one server based on a round-robin strategy and relays the server’s response back to the client. All communication is encrypted for security.
+- Sends a message from the client to a specific server.
+- Encrypts the message using the session key shared with the server.
+- Waits for an encrypted response from the server and decrypts it.
+
+`void handle_client(int client_sock, gmp_randstate_t state)`
+ 
+- Handles a single client session.
+- Executes a Diffie-Hellman key exchange to establish a shared session key with the client.
+- Receives client requests, processes them, and forwards them to the servers as needed.
+- Supports three commands: STORE, RETRIEVE, and EXIT.
 
 `int main()`
  
-- Initializes and operates the router application as a TCP server that listens for incoming client connections, forwards their requests to servers, and handles secure communication. 
-Configures socket settings, uses a secure random state for key exchange, and delegates each client connection to handle_client for processing. 
+- Initializes the router and listens for incoming client connections.
+- Handles multiple client connections sequentially (not concurrently).
 
 
 ## Analysis and Discussion
