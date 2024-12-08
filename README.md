@@ -89,6 +89,8 @@ typedef struct Block {
 
 ## How to run tests
 
+Please download the vm image from this google drive file, it should have all the necessary files within it: `https://drive.google.com/drive/folders/13YDJP4KQxSa0truhdP5hREcnWT6LlQOA?usp=sharing`
+
 ### Setup/Config
 
 Ideally, the .ova file will find its way, and this setup will not be required, but in the case that it does not, here is a guide on how to set up a mininet environment for running the tests:
@@ -183,7 +185,7 @@ Ideally, the .ova file will find its way, and this setup will not be required, b
  mpz_t a,
  gmp_randstate_t state, uint8_t * n0)`
 
-- In the key exchange between a client and a server, prepares the values for the client to send to send to the server. 
+- In the key exchange between a client and a server, prepares the values for the client to send to the server. 
 - This is initiating the key exchange from the client side.
 - It sends a random large prime number, the dhA (g^a mod p), and a nonce (n0)
 
